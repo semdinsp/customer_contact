@@ -166,6 +166,10 @@ defmodule CustomerContact.Web.CampaignLive do
     do:
       "Not sent: the audience changed from #{approved} to #{now} recipients since approval. Approval was revoked; review and approve again."
 
+  defp error_message(:missing_postal_address),
+    do:
+      "The organisation's postal address isn't set. Bulk email must include one; ask a developer to add it to the app's brand."
+
   defp error_message(:not_approved), do: "This campaign is not approved (or changed since approval)."
   defp error_message(other), do: "Error: #{inspect(other)}"
 
@@ -176,7 +180,8 @@ defmodule CustomerContact.Web.CampaignLive do
         editable: Campaign.editable?(assigns.campaign),
         tested: assigns.campaign.id && Campaign.tested?(assigns.campaign),
         approved: assigns.campaign.id && Campaign.approved?(assigns.campaign),
-        selected: assigns.form[:segment_ids].value || []
+        selected: assigns.form[:segment_ids].value || [],
+        postal_address?: Campaigns.postal_address?()
       )
 
     ~H"""
@@ -193,6 +198,10 @@ defmodule CustomerContact.Web.CampaignLive do
         >
           View report
         </.link>
+      </div>
+      <div :if={not @postal_address?} role="alert" class="alert alert-warning mb-4" id="missing-postal-address">
+        The organisation's postal address isn't set, so campaigns can't be approved or sent. Bulk email must
+        include one; ask a developer to add <code>postal_address</code> to the app's brand.
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">

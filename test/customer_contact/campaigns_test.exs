@@ -53,6 +53,18 @@ defmodule CustomerContact.CampaignsTest do
       assert [%Delivery{test: true, status: "sent"}] = Repo.all(Delivery)
     end
 
+    test "approval and sending require a postal address" do
+      campaign = approved_campaign()
+      Process.put(:cc_postal_address, "  ")
+      assert {:error, :missing_postal_address} = Campaigns.start_send(campaign, "a")
+
+      {:ok, campaign} = Campaigns.revoke_approval(campaign)
+      assert {:error, :missing_postal_address} = Campaigns.approve(campaign, "a", "2")
+
+      Process.delete(:cc_postal_address)
+      assert {:ok, %{status: "approved"}} = Campaigns.approve(campaign, "a", "2")
+    end
+
     test "approval requires the typed recipient count" do
       test_recipient_fixture()
       {:ok, campaign, _} = Campaigns.send_test(campaign_fixture(), "a")

@@ -15,7 +15,7 @@ defmodule CustomerContact.TestHost do
     %{
       name: "Test Org",
       from: {"Test Org", "news@example.test"},
-      postal_address: "1 Test St, Testville",
+      postal_address: Process.get(:cc_postal_address, "1 Test St, Testville"),
       website_url: "https://example.test"
     }
   end

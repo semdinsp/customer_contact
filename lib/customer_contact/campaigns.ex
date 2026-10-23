@@ -125,6 +125,8 @@ defmodule CustomerContact.Campaigns do
   @doc """
   Approves a tested draft. `typed_count` must equal the current number of
   deliverable recipients, as a guard against sending to the wrong list.
+  Refused while the host's brand has no postal address, which bulk email
+  must include (CAN-SPAM, CASL).
   """
   def approve(%Campaign{} = campaign, actor, typed_count) do
     locked(campaign, fn campaign ->
@@ -133,6 +135,9 @@ defmodule CustomerContact.Campaigns do
       cond do
         campaign.status != "draft" ->
           {:error, :not_draft}
+
+        not postal_address?() ->
+          {:error, :missing_postal_address}
 
         not Campaign.tested?(campaign) ->
           {:error, :not_tested}
@@ -189,6 +194,9 @@ defmodule CustomerContact.Campaigns do
         cond do
           not Campaign.approved?(campaign) ->
             {:error, :not_approved}
+
+          not postal_address?() ->
+            {:error, :missing_postal_address}
 
           count != campaign.approved_count ->
             {:ok, _} = do_revoke(campaign)
@@ -300,6 +308,9 @@ defmodule CustomerContact.Campaigns do
     |> then(fn q -> if status, do: where(q, [d], d.status == ^status), else: q end)
     |> repo().all()
   end
+
+  @doc "True when the host's brand includes the postal address the email footer must show."
+  def postal_address?, do: not blank?(CustomerContact.brand()[:postal_address])
 
   defp blank?(value), do: value in [nil, ""] or String.trim(value) == ""
 
