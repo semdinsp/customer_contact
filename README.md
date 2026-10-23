@@ -65,13 +65,24 @@ mail under CAN-SPAM and Canada's CASL).
   host's admin plug.
 * The HTML preview renders in an `<iframe sandbox="">` (no scripts, no
   same-origin access), so pasted HTML can't act on the admin's session.
-  `<script>` tags are stripped from outgoing mail.
-* SNS messages are accepted only from topics listed in `:sns_topic_arns`, with
-  a signing certificate from `https://sns.<region>.amazonaws.com`, and a valid
-  RSA signature. (Anyone can get AWS to sign messages for *their own* topic, so
-  the topic allow-list is essential.)
+  (`<script>` blocks are also dropped from outgoing mail as a courtesy; this
+  is not a sanitizer, since only admins author campaign HTML.)
+* Every workflow step re-reads and row-locks the campaign, so a stale browser
+  tab can't edit or revoke a campaign that is already sending. Workers refuse
+  to send if the content or audience no longer matches what was approved, and
+  sending is refused (approval revoked) if the recipient count changed since
+  approval.
+* SNS messages are accepted only from topics listed in `:sns_topic_arns`,
+  signed with a certificate fetched from exactly
+  `https://sns.<topic's region>.amazonaws.com/SimpleNotificationService-*.pem`
+  (no look-alike hosts such as S3 buckets, no query strings). Anyone can get
+  AWS to sign messages for *their own* topic, so the topic allow-list is
+  essential. Consider setting the topic's `SignatureVersion` to `2` (SHA-256).
+* Tracking tokens never contain email addresses. Replaying a pixel or link
+  increments counters but doesn't add event rows.
 * Unsubscribe `GET` only shows a confirmation; the change happens on `POST`, so
   link scanners can't unsubscribe people.
+* Recipient addresses that aren't well-formed are skipped.
 * No credentials live in this library. AWS keys, configuration-set names and
   topic ARNs come from the host's runtime environment.
 
@@ -95,5 +106,5 @@ git.
 ## Roadmap
 
 * SMS channel (`channel` is already on campaigns and deliveries; add a sender
-  in `CustomerContact.Sender`).
+  in `lib/customer_contact/sender.ex`).
 * Saved, reusable templates per app.

@@ -170,6 +170,9 @@ end
   `sent_by`. It's read from `@current_scope.user.email` or
   `@current_user.email`.
 
+If the app already rate-limits public routes (e.g. with a Plug or at the
+proxy), cover `/cc/*` too. It's optional; the endpoints are cheap and bounded.
+
 Add a "Customer contact" link to the admin dashboard or nav that points to
 `/admin/contact`.
 
@@ -206,7 +209,8 @@ Include this checklist, filled in with this app's names, in the final summary:
 1. **SES → Configuration sets → Create**: `<app>-campaigns`.
 2. **SNS → Topics → Create** (Standard, same region as SES): `<app>-ses-events`.
 3. **SES → Configuration set → Event destinations → Add**: choose Amazon SNS
-   and the topic above. Events: Sends, Rejects, Deliveries, Hard bounces,
+   and the topic above. (Optional: on the SNS topic set the `SignatureVersion`
+   attribute to `2` so messages are signed with SHA-256.) Events: Sends, Rejects, Deliveries, Hard bounces,
    Complaints, Rendering failures.
 4. `fly secrets set CC_SES_CONFIGURATION_SET=<app>-campaigns CC_SNS_TOPIC_ARNS=<topic ARN>`
    and deploy **before** the next step.
