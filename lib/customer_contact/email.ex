@@ -19,7 +19,7 @@ defmodule CustomerContact.Email do
   """
   def build(%Campaign{} = campaign, %Delivery{} = delivery, opts \\ []) do
     brand = CustomerContact.brand()
-    unsubscribe_url = Tracking.unsubscribe_url(delivery.id, delivery.email)
+    unsubscribe_url = Tracking.unsubscribe_url(delivery.id)
     track? = Keyword.get(opts, :track, true)
     html = render_html(campaign, delivery, brand, unsubscribe_url, track?)
 

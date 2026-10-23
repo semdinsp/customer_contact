@@ -22,9 +22,9 @@ defmodule CustomerContact.Tracking do
 
   def click_url(delivery_id, url), do: CustomerContact.public_url("/c/" <> sign(@click_salt, {delivery_id, url}))
 
-  def unsubscribe_url(delivery_id, email) do
-    CustomerContact.public_url("/u/" <> sign(@unsubscribe_salt, {delivery_id, Audience.normalize_email(email)}))
-  end
+  # Only the delivery id is in the token: Phoenix tokens are signed, not
+  # encrypted, and these URLs end up in logs and mail headers.
+  def unsubscribe_url(delivery_id), do: CustomerContact.public_url("/u/" <> sign(@unsubscribe_salt, delivery_id))
 
   ## Token verification
 
@@ -39,9 +39,12 @@ defmodule CustomerContact.Tracking do
     end
   end
 
+  @doc "Returns the delivery an unsubscribe token belongs to."
   def verify_unsubscribe(token) do
-    case verify(@unsubscribe_salt, token) do
-      {:ok, {delivery_id, email}} -> {:ok, {delivery_id, email}}
+    with {:ok, delivery_id} when is_binary(delivery_id) <- verify(@unsubscribe_salt, token),
+         %Delivery{} = delivery <- repo().get(Delivery, delivery_id) do
+      {:ok, delivery}
+    else
       _ -> :error
     end
   end
@@ -66,20 +69,16 @@ defmodule CustomerContact.Tracking do
 
   ## Recording
 
+  # Counters always increase; an event row is written only for the first
+  # open/click, so replaying a pixel or link can't grow the events table.
   def record_open(delivery_id) do
     now = now()
 
-    {count, _} =
-      from(d in Delivery,
-        where: d.id == ^delivery_id,
-        update: [
-          inc: [open_count: 1],
-          set: [first_opened_at: coalesce(d.first_opened_at, ^now), updated_at: ^now]
-        ]
-      )
-      |> repo().update_all([])
+    if first?(delivery_id, :first_opened_at, now), do: insert_event(delivery_id, "open")
 
-    if count == 1, do: insert_event(delivery_id, "open")
+    from(d in Delivery, where: d.id == ^delivery_id, update: [inc: [open_count: 1]])
+    |> repo().update_all([])
+
     :ok
   end
 
@@ -87,38 +86,38 @@ defmodule CustomerContact.Tracking do
   def record_click(delivery_id, url) do
     now = now()
 
-    {count, _} =
-      from(d in Delivery,
-        where: d.id == ^delivery_id,
-        update: [
-          inc: [click_count: 1],
-          set: [
-            first_clicked_at: coalesce(d.first_clicked_at, ^now),
-            first_opened_at: coalesce(d.first_opened_at, ^now),
-            updated_at: ^now
-          ]
-        ]
-      )
-      |> repo().update_all([])
+    if first?(delivery_id, :first_opened_at, now), do: insert_event(delivery_id, "open")
+    if first?(delivery_id, :first_clicked_at, now), do: insert_event(delivery_id, "click", %{url: url})
 
-    if count == 1, do: insert_event(delivery_id, "click", %{url: url})
+    from(d in Delivery, where: d.id == ^delivery_id, update: [inc: [click_count: 1]])
+    |> repo().update_all([])
+
     :ok
   end
 
-  def record_unsubscribe(delivery_id, email) do
-    {:ok, _} = Audience.suppress(email, "unsubscribe", "Unsubscribe link")
+  defp first?(delivery_id, field, now) do
+    {count, _} =
+      from(d in Delivery, where: d.id == ^delivery_id and is_nil(field(d, ^field)))
+      |> repo().update_all(set: [{field, now}, {:updated_at, now}])
 
-    if delivery_id do
-      now = now()
+    count == 1
+  end
 
-      {count, _} =
-        from(d in Delivery, where: d.id == ^delivery_id and is_nil(d.unsubscribed_at))
-        |> repo().update_all(set: [unsubscribed_at: now, updated_at: now])
+  def record_unsubscribe(%Delivery{} = delivery) do
+    case Audience.suppress(delivery.email, "unsubscribe", "Unsubscribe link") do
+      {:ok, _} ->
+        now = now()
 
-      if count == 1, do: insert_event(delivery_id, "unsubscribe")
+        {count, _} =
+          from(d in Delivery, where: d.id == ^delivery.id and is_nil(d.unsubscribed_at))
+          |> repo().update_all(set: [unsubscribed_at: now, updated_at: now])
+
+        if count == 1, do: insert_event(delivery.id, "unsubscribe")
+        :ok
+
+      {:error, _} ->
+        :error
     end
-
-    :ok
   end
 
   @doc false

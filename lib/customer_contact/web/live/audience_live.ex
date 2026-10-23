@@ -187,7 +187,7 @@ defmodule CustomerContact.Web.AudienceLive do
               </span>
             </div>
 
-            <form phx-change="search" class="mt-4">
+            <form phx-change="search" class="mt-4" id="tag-search">
               <input
                 type="search"
                 name="q"

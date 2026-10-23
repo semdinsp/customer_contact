@@ -14,5 +14,5 @@ defmodule CustomerContact.Web.Hooks do
   # `current_user` assign.
   defp actor(%{current_scope: %{user: %{email: email}}}) when is_binary(email), do: email
   defp actor(%{current_user: %{email: email}}) when is_binary(email), do: email
-  defp actor(_), do: "admin"
+  defp actor(_), do: "unknown admin"
 end

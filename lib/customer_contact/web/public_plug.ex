@@ -54,7 +54,7 @@ defmodule CustomerContact.Web.PublicPlug do
 
   get "/u/:token" do
     case Tracking.verify_unsubscribe(token) do
-      {:ok, {_delivery_id, email}} ->
+      {:ok, %{email: email}} ->
         # GET only shows a confirmation: link scanners must not unsubscribe people.
         body = """
         <p>Unsubscribe <strong>#{esc(email)}</strong> from #{esc(brand_name())} emails?</p>
@@ -72,9 +72,15 @@ defmodule CustomerContact.Web.PublicPlug do
 
   post "/u/:token" do
     case Tracking.verify_unsubscribe(token) do
-      {:ok, {delivery_id, email}} ->
-        Tracking.record_unsubscribe(delivery_id, email)
-        page(conn, 200, "Unsubscribed", "#{email} will no longer receive these emails.")
+      {:ok, delivery} ->
+        case Tracking.record_unsubscribe(delivery) do
+          :ok ->
+            page(conn, 200, "Unsubscribed", "#{delivery.email} will no longer receive these emails.")
+
+          :error ->
+            Logger.error("CustomerContact could not unsubscribe delivery #{delivery.id}")
+            page(conn, 500, "Something went wrong", "Please reply to the email and ask to be unsubscribed.")
+        end
 
       :error ->
         page(conn, 404, "Link not found", "This unsubscribe link is invalid.")
