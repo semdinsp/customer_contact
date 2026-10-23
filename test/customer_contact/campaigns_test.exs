@@ -21,6 +21,14 @@ defmodule CustomerContact.CampaignsTest do
       assert [%{email: "ok@example.com"}] = Audience.deliverable_recipients(["all"])
     end
 
+    test "test recipients need a well-formed address" do
+      for email <- ["a@b", "a,b@example.com", "x<y@example.com", ~s("q"@example.com)] do
+        assert {:error, %Ecto.Changeset{}} = Audience.add_test_recipient(%{email: email}), email
+      end
+
+      assert {:ok, _} = Audience.add_test_recipient(%{email: " Pat@Example.com "})
+    end
+
     test "ensure_tag creates a tag once and then returns it" do
       assert {:ok, tag} = Audience.ensure_tag("Donors", "Synced from checkouts")
       assert {:ok, same} = Audience.ensure_tag(" Donors ")
