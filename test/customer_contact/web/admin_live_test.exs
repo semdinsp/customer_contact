@@ -15,9 +15,9 @@ defmodule CustomerContact.Web.AdminLiveTest do
              live(Plug.Test.init_test_session(build_conn(), %{}), "/admin/contact")
   end
 
-  test "the header links home" do
+  test "the header's home icon links to the router's home_path" do
     {:ok, view, _html} = live(admin_conn(), "/admin/contact")
-    assert has_element?(view, ~s|#cc-home[href="/"]|)
+    assert has_element?(view, ~s|#cc-home[href="/admin"]|)
   end
 
   test "create, test, approve and send a campaign" do

@@ -180,7 +180,7 @@ defmodule CustomerContact.Web.CampaignLive do
       )
 
     ~H"""
-    <.shell flash={@flash} base={@cc_base} active={:campaigns}>
+    <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <h2 class="text-lg font-semibold">{@campaign.name || "New campaign"}</h2>
         <.status_badge :if={@campaign.id} status={@campaign.status} />

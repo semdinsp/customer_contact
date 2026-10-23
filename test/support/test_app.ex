@@ -59,7 +59,7 @@ defmodule CustomerContact.TestRouter do
 
   scope "/admin" do
     pipe_through :browser
-    customer_contact_admin("/contact", on_mount: [{CustomerContact.TestAuth, :require_admin}])
+    customer_contact_admin "/contact", on_mount: [{CustomerContact.TestAuth, :require_admin}], home_path: "/admin"
   end
 
   forward "/cc", CustomerContact.Web.PublicPlug

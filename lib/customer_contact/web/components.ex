@@ -6,6 +6,7 @@ defmodule CustomerContact.Web.Components do
 
   attr :flash, :map, required: true
   attr :base, :string, required: true
+  attr :home, :string, default: "/"
   attr :active, :atom, required: true
   slot :inner_block, required: true
 
@@ -13,7 +14,7 @@ defmodule CustomerContact.Web.Components do
     ~H"""
     <div class="mx-auto max-w-6xl px-4 py-6">
       <div class="flex flex-wrap items-center gap-2 mb-6">
-        <.link href="/" class="btn btn-sm btn-ghost btn-square" title="Home" aria-label="Home" id="cc-home">
+        <.link href={@home} class="btn btn-sm btn-ghost btn-square" title="Home" aria-label="Home" id="cc-home">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"

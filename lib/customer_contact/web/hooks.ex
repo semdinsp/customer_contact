@@ -2,10 +2,11 @@ defmodule CustomerContact.Web.Hooks do
   @moduledoc false
   import Phoenix.Component, only: [assign: 3]
 
-  def on_mount({:base_path, base}, _params, _session, socket) do
+  def on_mount({:paths, base, home}, _params, _session, socket) do
     {:cont,
      socket
      |> assign(:cc_base, String.trim_trailing(base, "/"))
+     |> assign(:cc_home, home)
      |> assign(:cc_actor, actor(socket.assigns))}
   end
 

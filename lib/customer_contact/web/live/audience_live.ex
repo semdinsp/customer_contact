@@ -99,7 +99,7 @@ defmodule CustomerContact.Web.AudienceLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.shell flash={@flash} base={@cc_base} active={:audience}>
+    <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:audience}>
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="card bg-base-200">
           <div class="card-body p-4">
