@@ -119,7 +119,7 @@ defmodule CustomerContact.Web.CampaignLive do
   end
 
   def handle_event("send", _params, socket) do
-    campaign = Campaigns.get_campaign!(socket.assigns.campaign.id)
+    campaign = socket.assigns.campaign
 
     case Campaigns.start_send(campaign, socket.assigns.cc_actor) do
       {:ok, campaign} ->
@@ -165,6 +165,9 @@ defmodule CustomerContact.Web.CampaignLive do
   defp error_message({:audience_changed, approved, now}),
     do:
       "Not sent: the audience changed from #{approved} to #{now} recipients since approval. Approval was revoked; review and approve again."
+
+  defp error_message(:changed_elsewhere),
+    do: "This campaign was changed in another window or by another admin. Reload the page to see the current version."
 
   defp error_message(:missing_postal_address),
     do:

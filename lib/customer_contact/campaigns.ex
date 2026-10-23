@@ -127,14 +127,21 @@ defmodule CustomerContact.Campaigns do
   deliverable recipients, as a guard against sending to the wrong list.
   Refused while the host's brand has no postal address, which bulk email
   must include (CAN-SPAM, CASL).
+
+  `seen` is the campaign as the approver saw it. If someone else has changed
+  the content or audience since, approval is refused, so nobody approves
+  content they haven't looked at.
   """
-  def approve(%Campaign{} = campaign, actor, typed_count) do
-    locked(campaign, fn campaign ->
+  def approve(%Campaign{} = seen, actor, typed_count) do
+    locked(seen, fn campaign ->
       count = Audience.count_deliverable(campaign.segment_ids)
 
       cond do
         campaign.status != "draft" ->
           {:error, :not_draft}
+
+        Campaign.approval_hash(campaign) != Campaign.approval_hash(seen) ->
+          {:error, :changed_elsewhere}
 
         not postal_address?() ->
           {:error, :missing_postal_address}
@@ -184,16 +191,20 @@ defmodule CustomerContact.Campaigns do
   @doc """
   Starts sending an approved campaign. Safe against double clicks. If the
   audience size no longer matches the approved count, approval is revoked
-  and nothing is sent.
+  and nothing is sent. Like `approve/3`, refused if the campaign differs from
+  `seen`, the copy the sender was looking at.
   """
-  def start_send(%Campaign{} = campaign, actor) do
-    count = Audience.count_deliverable(campaign.segment_ids)
+  def start_send(%Campaign{} = seen, actor) do
+    count = Audience.count_deliverable(seen.segment_ids)
 
     result =
-      locked(campaign, fn campaign ->
+      locked(seen, fn campaign ->
         cond do
           not Campaign.approved?(campaign) ->
             {:error, :not_approved}
+
+          Campaign.approval_hash(seen) != campaign.approved_hash ->
+            {:error, :changed_elsewhere}
 
           not postal_address?() ->
             {:error, :missing_postal_address}

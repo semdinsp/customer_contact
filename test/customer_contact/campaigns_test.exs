@@ -73,6 +73,22 @@ defmodule CustomerContact.CampaignsTest do
       assert {:ok, %{status: "approved"}} = Campaigns.approve(campaign, "a", "2")
     end
 
+    test "approve and send refuse a campaign changed since the admin last saw it" do
+      test_recipient_fixture()
+      {:ok, seen, _} = Campaigns.send_test(campaign_fixture(), "a")
+
+      {:ok, changed} = Campaigns.update_campaign(seen, %{html_body: "<p>Someone else's edit</p>"})
+      {:ok, changed, _} = Campaigns.send_test(changed, "b")
+      assert {:error, :changed_elsewhere} = Campaigns.approve(seen, "a", "2")
+
+      {:ok, approved} = Campaigns.approve(changed, "b", "2")
+      {:ok, _} = Campaigns.revoke_approval(approved)
+      {:ok, edited} = Campaigns.update_campaign(approved, %{subject: "Hello again {{first_name}}"})
+      {:ok, edited, _} = Campaigns.send_test(edited, "b")
+      {:ok, _} = Campaigns.approve(edited, "b", "2")
+      assert {:error, :changed_elsewhere} = Campaigns.start_send(approved, "a")
+    end
+
     test "approval requires the typed recipient count" do
       test_recipient_fixture()
       {:ok, campaign, _} = Campaigns.send_test(campaign_fixture(), "a")
