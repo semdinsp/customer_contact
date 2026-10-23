@@ -44,6 +44,12 @@ If Oban already runs, add `customer_contact: 5` to its `queues`. Keep the
 concurrency at or below the account's SES maximum send rate (check it in the
 SES console; 14/s is a common starting quota).
 
+If the app already sets an Oban `testing:` mode, keep it. `:manual` and
+`:inline` both work with the library. Under `:inline`, a test that clicks
+Send also runs the send jobs immediately, so the emails reach the Swoosh
+test mailbox right away rather than waiting as enqueued jobs. Write
+assertions to match the mode in use.
+
 ## 3. Migration
 
 ```elixir
