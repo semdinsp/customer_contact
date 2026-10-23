@@ -21,6 +21,14 @@ defmodule CustomerContact.CampaignsTest do
       assert [%{email: "ok@example.com"}] = Audience.deliverable_recipients(["all"])
     end
 
+    test "ensure_tag creates a tag once and then returns it" do
+      assert {:ok, tag} = Audience.ensure_tag("Donors", "Synced from checkouts")
+      assert {:ok, same} = Audience.ensure_tag(" Donors ")
+      assert same.id == tag.id
+      assert same.description == "Synced from checkouts"
+      assert {:error, %Ecto.Changeset{}} = Audience.ensure_tag("")
+    end
+
     test "built-in tags select recipients by ref" do
       {:ok, tag} = Audience.create_tag(%{name: "VIP"})
       Audience.tag_recipient(tag.id, "2")
