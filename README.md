@@ -171,7 +171,9 @@ daisyUI), and the AWS SES/SNS setup in the prompt's checklist.
   (`<script>` blocks are also dropped from outgoing mail as a courtesy; this
   is not a sanitizer, since only admins author campaign HTML.)
 * Every workflow step re-reads and row-locks the campaign, so a stale browser
-  tab can't edit or revoke a campaign that is already sending. Workers refuse
+  tab can't edit or revoke a campaign that is already sending. Approve and
+  Send are refused if the campaign changed since the admin's page loaded, so
+  nobody approves or sends content they haven't seen. Workers refuse
   to send if the content or audience no longer matches what was approved, and
   sending is refused (approval revoked) if the recipient count changed since
   approval.
@@ -181,6 +183,8 @@ daisyUI), and the AWS SES/SNS setup in the prompt's checklist.
   (no look-alike hosts such as S3 buckets, no query strings). Anyone can get
   AWS to sign messages for *their own* topic, so the topic allow-list is
   essential. Consider setting the topic's `SignatureVersion` to `2` (SHA-256).
+  Messages more than an hour old are refused (no replays), and fetches of
+  certificates not yet cached are limited to 10 a minute.
 * Tracking tokens never contain email addresses. Replaying a pixel or link
   increments counters but doesn't add event rows.
 * Unsubscribe `GET` only shows a confirmation; the change happens on `POST`, so

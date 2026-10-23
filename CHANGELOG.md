@@ -14,6 +14,15 @@
 * **Formatter.** The library exports `locals_without_parens` for
   `customer_contact_admin`. Add `:customer_contact` to the app's
   `.formatter.exs` `import_deps` so `mix format` stops adding parentheses.
+* **Security hardening** (from a review after the first deployments; no high
+  or medium issues were found):
+  * SNS messages more than an hour old are refused, so captured ones can't be
+    replayed.
+  * Fetching not-yet-cached SNS signing certificates is limited to 10 a
+    minute with short timeouts; temporary failures return 503 so SNS retries.
+  * Approve and Send are refused if another admin or window changed the
+    campaign since the page was loaded.
+  * Test recipient addresses get the same strict check as audience addresses.
 
 Upgrading: change the dependency tag to `v0.1.2`, add `home_path:` to the
 `customer_contact_admin` call, and make sure `brand/0` has a postal address.
