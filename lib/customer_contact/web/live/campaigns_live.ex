@@ -19,7 +19,7 @@ defmodule CustomerContact.Web.CampaignsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.shell flash={@flash} base={@cc_base} active={:campaigns}>
+    <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold">Campaigns</h2>
         <.link navigate={@cc_base <> "/campaigns/new"} class="btn btn-primary btn-sm" id="new-campaign">

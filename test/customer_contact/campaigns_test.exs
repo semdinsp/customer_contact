@@ -21,6 +21,22 @@ defmodule CustomerContact.CampaignsTest do
       assert [%{email: "ok@example.com"}] = Audience.deliverable_recipients(["all"])
     end
 
+    test "test recipients need a well-formed address" do
+      for email <- ["a@b", "a,b@example.com", "x<y@example.com", ~s("q"@example.com)] do
+        assert {:error, %Ecto.Changeset{}} = Audience.add_test_recipient(%{email: email}), email
+      end
+
+      assert {:ok, _} = Audience.add_test_recipient(%{email: " Pat@Example.com "})
+    end
+
+    test "ensure_tag creates a tag once and then returns it" do
+      assert {:ok, tag} = Audience.ensure_tag("Donors", "Synced from checkouts")
+      assert {:ok, same} = Audience.ensure_tag(" Donors ")
+      assert same.id == tag.id
+      assert same.description == "Synced from checkouts"
+      assert {:error, %Ecto.Changeset{}} = Audience.ensure_tag("")
+    end
+
     test "built-in tags select recipients by ref" do
       {:ok, tag} = Audience.create_tag(%{name: "VIP"})
       Audience.tag_recipient(tag.id, "2")
@@ -51,6 +67,34 @@ defmodule CustomerContact.CampaignsTest do
       assert_email_sent(subject: "[TEST] Hello Tester", to: [{"Tester", "tester@example.test"}])
       refute_email_sent()
       assert [%Delivery{test: true, status: "sent"}] = Repo.all(Delivery)
+    end
+
+    test "approval and sending require a postal address" do
+      campaign = approved_campaign()
+      Process.put(:cc_postal_address, "  ")
+      assert {:error, :missing_postal_address} = Campaigns.start_send(campaign, "a")
+
+      {:ok, campaign} = Campaigns.revoke_approval(campaign)
+      assert {:error, :missing_postal_address} = Campaigns.approve(campaign, "a", "2")
+
+      Process.delete(:cc_postal_address)
+      assert {:ok, %{status: "approved"}} = Campaigns.approve(campaign, "a", "2")
+    end
+
+    test "approve and send refuse a campaign changed since the admin last saw it" do
+      test_recipient_fixture()
+      {:ok, seen, _} = Campaigns.send_test(campaign_fixture(), "a")
+
+      {:ok, changed} = Campaigns.update_campaign(seen, %{html_body: "<p>Someone else's edit</p>"})
+      {:ok, changed, _} = Campaigns.send_test(changed, "b")
+      assert {:error, :changed_elsewhere} = Campaigns.approve(seen, "a", "2")
+
+      {:ok, approved} = Campaigns.approve(changed, "b", "2")
+      {:ok, _} = Campaigns.revoke_approval(approved)
+      {:ok, edited} = Campaigns.update_campaign(approved, %{subject: "Hello again {{first_name}}"})
+      {:ok, edited, _} = Campaigns.send_test(edited, "b")
+      {:ok, _} = Campaigns.approve(edited, "b", "2")
+      assert {:error, :changed_elsewhere} = Campaigns.start_send(approved, "a")
     end
 
     test "approval requires the typed recipient count" do

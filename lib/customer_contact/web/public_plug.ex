@@ -93,6 +93,11 @@ defmodule CustomerContact.Web.PublicPlug do
       handle_sns(msg)
       send_resp(conn, 200, "ok")
     else
+      # Temporary: a 5xx makes SNS retry the message later.
+      {:error, reason} when reason in [:cert_fetch_limited, :cert_unavailable] ->
+        Logger.warning("CustomerContact could not verify SNS message yet: #{inspect(reason)}")
+        send_resp(conn, 503, "try again")
+
       {:error, reason} ->
         Logger.warning("CustomerContact rejected SNS message: #{inspect(reason)}")
         send_resp(conn, 403, "forbidden")

@@ -17,7 +17,9 @@ defmodule CustomerContact.TestRecipient do
     |> cast(attrs, [:email, :name])
     |> update_change(:email, &CustomerContact.Audience.normalize_email/1)
     |> validate_required([:email])
-    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "must be a valid email")
+    |> validate_change(:email, fn :email, email ->
+      if CustomerContact.Audience.valid_email?(email), do: [], else: [email: "must be a valid email"]
+    end)
     |> validate_length(:email, max: 160)
     |> validate_length(:name, max: 120)
     |> unique_constraint(:email)

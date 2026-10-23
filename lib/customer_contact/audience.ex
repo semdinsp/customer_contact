@@ -134,6 +134,26 @@ defmodule CustomerContact.Audience do
 
   def create_tag(attrs), do: %Tag{} |> Tag.changeset(attrs) |> repo().insert()
 
+  @doc """
+  Returns the built-in tag with this name, creating it if needed. For apps
+  that tag recipients automatically (e.g. a "Donors" tag kept in sync).
+  """
+  def ensure_tag(name, description \\ nil) when is_binary(name) do
+    name = String.trim(name)
+
+    with nil <- repo().get_by(Tag, name: name),
+         {:error, changeset} <- create_tag(%{name: name, description: description}) do
+      # Another process may have created it between the lookup and the insert.
+      case repo().get_by(Tag, name: name) do
+        nil -> {:error, changeset}
+        tag -> {:ok, tag}
+      end
+    else
+      %Tag{} = tag -> {:ok, tag}
+      {:ok, tag} -> {:ok, tag}
+    end
+  end
+
   def change_tag(attrs \\ %{}), do: Tag.changeset(%Tag{}, attrs)
 
   def delete_tag(id) do

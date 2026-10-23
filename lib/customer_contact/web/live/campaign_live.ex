@@ -119,7 +119,7 @@ defmodule CustomerContact.Web.CampaignLive do
   end
 
   def handle_event("send", _params, socket) do
-    campaign = Campaigns.get_campaign!(socket.assigns.campaign.id)
+    campaign = socket.assigns.campaign
 
     case Campaigns.start_send(campaign, socket.assigns.cc_actor) do
       {:ok, campaign} ->
@@ -166,6 +166,13 @@ defmodule CustomerContact.Web.CampaignLive do
     do:
       "Not sent: the audience changed from #{approved} to #{now} recipients since approval. Approval was revoked; review and approve again."
 
+  defp error_message(:changed_elsewhere),
+    do: "This campaign was changed in another window or by another admin. Reload the page to see the current version."
+
+  defp error_message(:missing_postal_address),
+    do:
+      "The organisation's postal address isn't set. Bulk email must include one; ask a developer to add it to the app's brand."
+
   defp error_message(:not_approved), do: "This campaign is not approved (or changed since approval)."
   defp error_message(other), do: "Error: #{inspect(other)}"
 
@@ -176,11 +183,12 @@ defmodule CustomerContact.Web.CampaignLive do
         editable: Campaign.editable?(assigns.campaign),
         tested: assigns.campaign.id && Campaign.tested?(assigns.campaign),
         approved: assigns.campaign.id && Campaign.approved?(assigns.campaign),
-        selected: assigns.form[:segment_ids].value || []
+        selected: assigns.form[:segment_ids].value || [],
+        postal_address?: Campaigns.postal_address?()
       )
 
     ~H"""
-    <.shell flash={@flash} base={@cc_base} active={:campaigns}>
+    <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <h2 class="text-lg font-semibold">{@campaign.name || "New campaign"}</h2>
         <.status_badge :if={@campaign.id} status={@campaign.status} />
@@ -193,6 +201,10 @@ defmodule CustomerContact.Web.CampaignLive do
         >
           View report
         </.link>
+      </div>
+      <div :if={not @postal_address?} role="alert" class="alert alert-warning mb-4" id="missing-postal-address">
+        The organisation's postal address isn't set, so campaigns can't be approved or sent. Bulk email must
+        include one; ask a developer to add <code>postal_address</code> to the app's brand.
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">

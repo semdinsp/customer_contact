@@ -62,7 +62,7 @@ defmodule CustomerContact.Web.ReportLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.shell flash={@flash} base={@cc_base} active={:campaigns}>
+    <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
       <div class="flex flex-wrap items-center gap-3 mb-2">
         <h2 class="text-lg font-semibold">{@campaign.name}</h2>
         <.status_badge status={@campaign.status} />

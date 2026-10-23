@@ -15,7 +15,7 @@ defmodule CustomerContact.TestHost do
     %{
       name: "Test Org",
       from: {"Test Org", "news@example.test"},
-      postal_address: "1 Test St, Testville",
+      postal_address: Process.get(:cc_postal_address, "1 Test St, Testville"),
       website_url: "https://example.test"
     }
   end
@@ -59,7 +59,7 @@ defmodule CustomerContact.TestRouter do
 
   scope "/admin" do
     pipe_through :browser
-    customer_contact_admin("/contact", on_mount: [{CustomerContact.TestAuth, :require_admin}])
+    customer_contact_admin "/contact", on_mount: [{CustomerContact.TestAuth, :require_admin}], home_path: "/admin"
   end
 
   forward "/cc", CustomerContact.Web.PublicPlug

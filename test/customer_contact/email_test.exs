@@ -23,6 +23,29 @@ defmodule CustomerContact.EmailTest do
     assert email.text_body =~ "Hi Jo <b>Doe</b>"
   end
 
+  test "uses the fallback after | when a merge value is blank", %{campaign: campaign} do
+    campaign = %{
+      campaign
+      | subject: "Hello {{ first_name | friend }}",
+        html_body: "<p>Hi {{first_name|there}}, {{name}}</p>"
+    }
+
+    delivery = Repo.insert!(%Delivery{campaign_id: campaign.id, email: "anon@example.com", name: nil})
+    email = Email.build(campaign, delivery)
+
+    assert email.subject == "Hello friend"
+    assert email.html_body =~ "<p>Hi there, </p>"
+
+    named = Repo.insert!(%Delivery{campaign_id: campaign.id, email: "jo.doe@example.com", name: "Jo Doe"})
+    assert Email.build(campaign, named).html_body =~ "<p>Hi Jo, Jo Doe</p>"
+  end
+
+  test "escapes merge fallbacks in HTML", %{campaign: campaign} do
+    campaign = %{campaign | html_body: "<p>Hi {{first_name|<i>you</i>}}</p>"}
+    delivery = Repo.insert!(%Delivery{campaign_id: campaign.id, email: "anon@example.com", name: ""})
+    assert Email.build(campaign, delivery).html_body =~ "Hi &lt;i&gt;you&lt;/i&gt;"
+  end
+
   test "rewrites links to signed click URLs that decode to the original", %{campaign: campaign, delivery: delivery} do
     email = Email.build(campaign, delivery)
     refute email.html_body =~ ~s(href="https://example.org)

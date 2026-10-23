@@ -24,8 +24,11 @@ Follow this repo's CLAUDE.md git workflow: work on a new branch
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.0"},
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.2"},
 ```
+
+Add `:customer_contact` to `import_deps` in `.formatter.exs` so `mix format`
+leaves the `customer_contact_admin` router call without parentheses.
 
 The library depends on `phoenix_live_view`, `phoenix_ecto`, `ecto_sql`,
 `swoosh`, `oban (~> 2.19)` and `req`. Run `mix deps.get` and resolve any
@@ -80,7 +83,7 @@ defmodule MyApp.CustomerContactHost do
       name: "Organisation Name",
       from: {"Organisation Name", Application.fetch_env!(:my_app, :campaign_from_address)},
       reply_to: nil,                      # or "info@..."
-      postal_address: "Street, City, Province/State, Postal code",  # required by CAN-SPAM/CASL
+      postal_address: "Street, City, Province/State, Postal code",  # required: campaigns can't be approved without it
       website_url: "https://example.com",
       logo_url: "https://example.com/images/logo.png",  # absolute URL or nil
       primary_color: "#1e3a5f",           # match the site's existing email styling
@@ -109,6 +112,13 @@ end
 
 Pick the from address the app already uses for SES (it must be a verified
 SES identity). Don't hard-code secrets.
+
+If you don't know the organisation's postal address, don't invent one: leave
+it `nil`, tell the user, and the campaign page will warn until it's set.
+
+If the app should tag people automatically (e.g. a "Donors" tag kept in sync
+with payments), use `CustomerContact.Audience.ensure_tag(name, description)`
+to get the tag and `tag_recipient(tag.id, ref)` / `untag_recipient/2`.
 
 ## 5. Config
 
@@ -159,10 +169,13 @@ scope "/admin" do
   pipe_through [:browser, :require_authenticated_user, :require_admin_user]
 
   customer_contact_admin "/contact",
-    on_mount: [{MyAppWeb.UserAuth, :require_admin}]
+    on_mount: [{MyAppWeb.UserAuth, :require_admin}],
+    home_path: "/admin"
 end
 ```
 
+* Set `home_path` to the app's admin dashboard. The home icon in the page
+  header links there.
 * Use whatever this app's real admin plug and `on_mount` are called. **Both
   must reject non-admins**: anyone who reaches these pages can email every
   customer. If the app has no admin check yet, add one first (see the

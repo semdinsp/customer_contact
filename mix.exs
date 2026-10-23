@@ -1,7 +1,7 @@
 defmodule CustomerContact.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.2"
   @source_url "https://github.com/semdinsp/customer_contact"
 
   def project do
@@ -16,7 +16,7 @@ defmodule CustomerContact.MixProject do
         "Campaign email for Phoenix apps: paste HTML, test, approve, send to tagged " <>
           "recipients, and track delivery, opens, clicks and unsubscribes.",
       package: package(),
-      docs: [main: "readme", extras: ["README.md", "INTEGRATION_PROMPT.md"]],
+      docs: [main: "readme", extras: ["README.md", "CHANGELOG.md", "INTEGRATION_PROMPT.md"]],
       source_url: @source_url
     ]
   end
@@ -50,7 +50,7 @@ defmodule CustomerContact.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib mix.exs README.md INTEGRATION_PROMPT.md LICENSE .formatter.exs)
+      files: ~w(lib mix.exs README.md CHANGELOG.md INTEGRATION_PROMPT.md LICENSE .formatter.exs)
     ]
   end
 end

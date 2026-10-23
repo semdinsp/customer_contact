@@ -67,10 +67,12 @@ defmodule CustomerContact.Web.PublicPlugTest do
       pem = :public_key.pem_encode([{:Certificate, der, :not_encrypted}])
       Application.put_env(:customer_contact, :sns_cert_fetcher, fn @cert_url -> {:ok, pem} end)
       :persistent_term.erase({SNS, @cert_url})
+      :persistent_term.erase({SNS, :cert_fetches})
 
       on_exit(fn ->
         Application.delete_env(:customer_contact, :sns_cert_fetcher)
         :persistent_term.erase({SNS, @cert_url})
+        :persistent_term.erase({SNS, :cert_fetches})
       end)
 
       %{key: key}
@@ -84,7 +86,7 @@ defmodule CustomerContact.Web.PublicPlugTest do
             "MessageId" => "m1",
             "TopicArn" => @topic,
             "Message" => Jason.encode!(event),
-            "Timestamp" => "2026-10-22T00:00:00.000Z",
+            "Timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
             "SignatureVersion" => "2",
             "SigningCertURL" => @cert_url
           },
@@ -151,6 +153,31 @@ defmodule CustomerContact.Web.PublicPlugTest do
         msg = sns_message(key, %{}, %{"SigningCertURL" => url})
         assert response(post_sns(msg), 403), url
       end
+    end
+
+    test "old messages are rejected so captured ones can't be replayed", %{key: key, delivery: d} do
+      old = DateTime.utc_now() |> DateTime.add(-2, :hour) |> DateTime.to_iso8601()
+      event = %{"eventType" => "Delivery", "mail" => %{"messageId" => "ses-msg-1"}, "delivery" => %{}}
+      assert response(post_sns(sns_message(key, event, %{"Timestamp" => old})), 403)
+      assert %{status: "sent"} = Repo.get!(Delivery, d.id)
+    end
+
+    test "fetches of uncached certificates are rate limited", %{key: key} do
+      fetches = :counters.new(1, [])
+
+      Application.put_env(:customer_contact, :sns_cert_fetcher, fn _ ->
+        :counters.add(fetches, 1, 1)
+        {:error, :cert_unavailable}
+      end)
+
+      statuses =
+        for i <- 1..15 do
+          url = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-made#{i}up.pem"
+          post_sns(sns_message(key, %{}, %{"SigningCertURL" => url})).status
+        end
+
+      assert Enum.all?(statuses, &(&1 == 503))
+      assert :counters.get(fetches, 1) == 10
     end
 
     test "non-string fields are rejected, not crashed on", %{key: key} do
