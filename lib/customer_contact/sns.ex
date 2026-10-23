@@ -7,8 +7,10 @@ defmodule CustomerContact.SNS do
     * its `TopicArn` is listed in `config :customer_contact, sns_topic_arns: [...]`
       (anyone can create an SNS topic and have AWS sign messages for it, so
       the signature alone proves nothing about who sent it);
-    * its signing certificate comes from an `https://sns.<region>.amazonaws.com/`
-      URL; and
+    * its signing certificate URL is exactly
+      `https://sns.<topic region>.amazonaws.com/SimpleNotificationService-<id>.pem`
+      (no query, fragment or userinfo; the region comes from the allow-listed
+      TopicArn, so look-alike hosts such as S3 buckets are rejected); and
     * the RSA signature over the canonical string verifies against that
       certificate.
   """
@@ -33,16 +35,19 @@ defmodule CustomerContact.SNS do
     Record.extract(:OTPSubjectPublicKeyInfo, from_lib: "public_key/include/public_key.hrl")
   )
 
-  @aws_host ~r/\Asns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?\z/
+  @arn ~r/\Aarn:(aws|aws-cn|aws-us-gov):sns:([a-z0-9-]+):\d{12}:[A-Za-z0-9_-]+\z/
+  @cert_path ~r/\A\/SimpleNotificationService-[A-Za-z0-9]+\.pem\z/
 
   @notification_keys ~w(Message MessageId Subject Timestamp TopicArn Type)
   @subscription_keys ~w(Message MessageId SubscribeURL Timestamp Token TopicArn Type)
 
   def verify(%{"Type" => type, "TopicArn" => arn} = msg)
       when type in ["Notification", "SubscriptionConfirmation", "UnsubscribeConfirmation"] do
-    with :ok <- check_topic(arn),
+    with :ok <- check_strings(msg),
+         :ok <- check_topic(arn),
+         {:ok, host} <- sns_host(arn),
          {:ok, digest} <- digest(msg["SignatureVersion"]),
-         {:ok, cert_url} <- aws_url(msg["SigningCertURL"], ".pem"),
+         {:ok, cert_url} <- aws_url(msg["SigningCertURL"], host, @cert_path),
          {:ok, signature} <- decode_signature(msg["Signature"]),
          {:ok, key} <- public_key(cert_url) do
       if :public_key.verify(string_to_sign(msg), digest, signature, key), do: :ok, else: {:error, :bad_signature}
@@ -52,8 +57,9 @@ defmodule CustomerContact.SNS do
   def verify(_), do: {:error, :malformed}
 
   @doc "Confirms a verified SubscriptionConfirmation by visiting its SubscribeURL."
-  def confirm_subscription(%{"SubscribeURL" => url}) do
-    with {:ok, url} <- aws_url(url, nil),
+  def confirm_subscription(%{"SubscribeURL" => url, "TopicArn" => arn}) do
+    with {:ok, host} <- sns_host(arn),
+         {:ok, url} <- aws_url(url, host, nil, allow_query: true),
          {:ok, %{status: 200}} <- Req.get(url, retry: false, redirect: false) do
       :ok
     else
@@ -87,19 +93,42 @@ defmodule CustomerContact.SNS do
 
   defp decode_signature(_), do: {:error, :bad_signature}
 
-  defp aws_url(url, suffix) when is_binary(url) do
+  # Every signed field must be a string (form-encoded or odd JSON bodies
+  # would otherwise crash string_to_sign/1).
+  defp check_strings(msg) do
+    if Enum.all?(@subscription_keys ++ @notification_keys ++ ~w(Signature SigningCertURL SignatureVersion), fn key ->
+         not Map.has_key?(msg, key) or is_binary(msg[key])
+       end),
+       do: :ok,
+       else: {:error, :malformed}
+  end
+
+  defp sns_host(arn) do
+    case Regex.run(@arn, arn) do
+      [_, "aws-cn", region] -> {:ok, "sns.#{region}.amazonaws.com.cn"}
+      [_, _partition, region] -> {:ok, "sns.#{region}.amazonaws.com"}
+      _ -> {:error, :bad_topic_arn}
+    end
+  end
+
+  defp aws_url(url, expected_host, path_pattern, opts \\ [])
+
+  defp aws_url(url, expected_host, path_pattern, opts) when is_binary(url) do
     case URI.parse(url) do
-      %URI{scheme: "https", host: host, port: 443, path: path} when is_binary(host) and is_binary(path) ->
-        if Regex.match?(@aws_host, host) and (suffix == nil or String.ends_with?(path, suffix)),
-          do: {:ok, url},
-          else: {:error, :bad_url}
+      %URI{scheme: "https", host: ^expected_host, port: 443, userinfo: nil, fragment: nil, path: path, query: query}
+      when is_binary(path) ->
+        cond do
+          query != nil and not Keyword.get(opts, :allow_query, false) -> {:error, :bad_url}
+          path_pattern != nil and not Regex.match?(path_pattern, path) -> {:error, :bad_url}
+          true -> {:ok, url}
+        end
 
       _ ->
         {:error, :bad_url}
     end
   end
 
-  defp aws_url(_, _), do: {:error, :bad_url}
+  defp aws_url(_, _, _, _), do: {:error, :bad_url}
 
   defp public_key(url) do
     case :persistent_term.get({__MODULE__, url}, nil) do

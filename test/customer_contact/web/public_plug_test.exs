@@ -32,6 +32,8 @@ defmodule CustomerContact.Web.PublicPlugTest do
     assert response_content_type(conn, :gif) =~ "image/gif"
     get(build_conn(), path(Tracking.open_url(d.id)))
     assert %{open_count: 2, first_opened_at: %DateTime{}} = Repo.get!(Delivery, d.id)
+    # Replays bump the counter but don't add event rows.
+    assert Repo.aggregate(CustomerContact.Event, :count) == 1
 
     assert response(get(build_conn(), "/cc/o/forged.gif"), 200)
   end
@@ -47,7 +49,8 @@ defmodule CustomerContact.Web.PublicPlugTest do
   end
 
   test "unsubscribe GET only confirms; POST suppresses", %{delivery: d} do
-    url = path(Tracking.unsubscribe_url(d.id, d.email))
+    url = path(Tracking.unsubscribe_url(d.id))
+    refute url =~ Base.url_encode64("jo@example.com", padding: false)
     conn = get(build_conn(), url)
     assert html_response(conn, 200) =~ "Unsubscribe <strong>jo@example.com</strong>"
     refute Audience.suppressed?("jo@example.com")
@@ -134,8 +137,24 @@ defmodule CustomerContact.Web.PublicPlugTest do
       assert response(post_sns(msg), 403)
     end
 
-    test "certificates from non-AWS hosts are rejected", %{key: key} do
-      msg = sns_message(key, %{}, %{"SigningCertURL" => "https://evil.example/cert.pem"})
+    test "certificates from non-AWS or look-alike hosts are rejected", %{key: key} do
+      for url <- [
+            "https://evil.example/SimpleNotificationService-x.pem",
+            # S3 virtual-hosted bucket named "sns": matches a naive sns.*.amazonaws.com check
+            "https://sns.s3.amazonaws.com/SimpleNotificationService-x.pem",
+            # another region than the topic's
+            "https://sns.eu-west-1.amazonaws.com/SimpleNotificationService-x.pem",
+            "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem?n=1",
+            "https://sns.us-east-1.amazonaws.com/other/path.pem",
+            "https://user@sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem"
+          ] do
+        msg = sns_message(key, %{}, %{"SigningCertURL" => url})
+        assert response(post_sns(msg), 403), url
+      end
+    end
+
+    test "non-string fields are rejected, not crashed on", %{key: key} do
+      msg = sns_message(key, %{}) |> Map.put("Subject", %{"x" => 1})
       assert response(post_sns(msg), 403)
     end
   end
