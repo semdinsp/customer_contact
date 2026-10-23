@@ -129,7 +129,7 @@ defmodule CustomerContact.Web.CampaignLive do
          |> push_navigate(to: socket.assigns.cc_base <> "/campaigns/" <> campaign.id <> "/report")}
 
       {:error, reason} ->
-        {:noreply, socket |> put_flash(:error, error_message(reason)) |> load(campaign)}
+        {:noreply, socket |> put_flash(:error, error_message(reason)) |> load(Campaigns.get_campaign!(campaign.id))}
     end
   end
 
@@ -158,6 +158,13 @@ defmodule CustomerContact.Web.CampaignLive do
 
   defp error_message({:count_mismatch, count}),
     do: "The number typed does not match the #{count} recipients. Not approved."
+
+  defp error_message(:changed_during_test),
+    do: "The campaign changed while the test was sending. Send another test of the current content."
+
+  defp error_message({:audience_changed, approved, now}),
+    do:
+      "Not sent: the audience changed from #{approved} to #{now} recipients since approval. Approval was revoked; review and approve again."
 
   defp error_message(:not_approved), do: "This campaign is not approved (or changed since approval)."
   defp error_message(other), do: "Error: #{inspect(other)}"

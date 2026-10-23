@@ -36,6 +36,10 @@ defmodule CustomerContact.Workers.Deliver do
 
   defp run(delivery, campaign, job) do
     cond do
+      campaign.approved_hash != Campaign.approval_hash(campaign) ->
+        Campaigns.abort(campaign.id, "Stopped: content or audience changed after approval.")
+        :ok
+
       not claim(delivery) ->
         :ok
 

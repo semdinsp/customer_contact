@@ -27,27 +27,47 @@ defmodule CustomerContact.Campaigns do
     |> repo().insert()
   end
 
-  def update_campaign(%Campaign{} = campaign, attrs) do
-    if Campaign.editable?(campaign) do
-      changeset = Campaign.changeset(campaign, attrs)
+  # Every workflow step re-reads and row-locks the campaign, so a stale copy
+  # (e.g. an editor tab opened before someone else clicked Send) can never
+  # change a campaign that has moved on.
+  defp locked(%Campaign{id: id}, fun) do
+    repo().transaction(fn ->
+      campaign = repo().one!(from c in Campaign, where: c.id == ^id, lock: "FOR UPDATE")
 
-      with {:ok, updated} <- repo().update(changeset) do
-        if updated.status == "approved" and not Campaign.approved?(updated) do
-          revoke_approval(updated)
-        else
-          {:ok, updated}
-        end
+      case fun.(campaign) do
+        {:ok, result} -> result
+        {:error, reason} -> repo().rollback(reason)
       end
-    else
-      {:error, :not_editable}
+    end)
+  end
+
+  def update_campaign(%Campaign{} = campaign, attrs) do
+    locked(campaign, fn current ->
+      if Campaign.editable?(current) do
+        with {:ok, updated} <- repo().update(Campaign.changeset(current, attrs)) do
+          if updated.status == "approved" and not Campaign.approved?(updated),
+            do: do_revoke(updated),
+            else: {:ok, updated}
+        end
+      else
+        {:error, :not_editable}
+      end
+    end)
+  end
+
+  def delete_campaign(%Campaign{id: id}) do
+    case repo().delete_all(from c in Campaign, where: c.id == ^id and c.status == "draft") do
+      {1, _} -> {:ok, id}
+      _ -> {:error, :not_editable}
     end
   end
 
-  def delete_campaign(%Campaign{status: "draft"} = campaign), do: repo().delete(campaign)
-  def delete_campaign(%Campaign{}), do: {:error, :not_editable}
-
-  @doc "Sends the campaign to every test recipient, synchronously."
-  def send_test(%Campaign{} = campaign, actor) do
+  @doc """
+  Sends the campaign to every test recipient, synchronously. The content is
+  marked tested only if it is unchanged when the sends finish.
+  """
+  def send_test(%Campaign{id: id}, actor) do
+    campaign = get_campaign!(id)
     test_recipients = Audience.list_test_recipients()
 
     cond do
@@ -83,12 +103,20 @@ defmodule CustomerContact.Campaigns do
       end)
 
     if Enum.any?(results, &match?({_, :ok}, &1)) do
-      {:ok, campaign} =
-        campaign
-        |> Ecto.Changeset.change(tested_hash: Campaign.content_hash(campaign), tested_at: now(), tested_by: actor)
-        |> repo().update()
+      tested_hash = Campaign.content_hash(campaign)
 
-      {:ok, campaign, results}
+      result =
+        locked(campaign, fn current ->
+          if Campaign.editable?(current) and Campaign.content_hash(current) == tested_hash do
+            current
+            |> Ecto.Changeset.change(tested_hash: tested_hash, tested_at: now(), tested_by: actor)
+            |> repo().update()
+          else
+            {:error, :changed_during_test}
+          end
+        end)
+
+      with {:ok, campaign} <- result, do: {:ok, campaign, results}
     else
       {:error, {:send_failed, results}}
     end
@@ -99,38 +127,42 @@ defmodule CustomerContact.Campaigns do
   deliverable recipients, as a guard against sending to the wrong list.
   """
   def approve(%Campaign{} = campaign, actor, typed_count) do
-    count = Audience.count_deliverable(campaign.segment_ids)
+    locked(campaign, fn campaign ->
+      count = Audience.count_deliverable(campaign.segment_ids)
 
-    cond do
-      campaign.status != "draft" ->
-        {:error, :not_draft}
+      cond do
+        campaign.status != "draft" ->
+          {:error, :not_draft}
 
-      not Campaign.tested?(campaign) ->
-        {:error, :not_tested}
+        not Campaign.tested?(campaign) ->
+          {:error, :not_tested}
 
-      campaign.segment_ids == [] ->
-        {:error, :no_audience}
+        campaign.segment_ids == [] ->
+          {:error, :no_audience}
 
-      count == 0 ->
-        {:error, :no_recipients}
+        count == 0 ->
+          {:error, :no_recipients}
 
-      parse_int(typed_count) != count ->
-        {:error, {:count_mismatch, count}}
+        parse_int(typed_count) != count ->
+          {:error, {:count_mismatch, count}}
 
-      true ->
-        campaign
-        |> Ecto.Changeset.change(
-          status: "approved",
-          approved_hash: Campaign.approval_hash(campaign),
-          approved_count: count,
-          approved_at: now(),
-          approved_by: actor
-        )
-        |> repo().update()
-    end
+        true ->
+          campaign
+          |> Ecto.Changeset.change(
+            status: "approved",
+            approved_hash: Campaign.approval_hash(campaign),
+            approved_count: count,
+            approved_at: now(),
+            approved_by: actor
+          )
+          |> repo().update()
+      end
+    end)
   end
 
-  def revoke_approval(%Campaign{status: "approved"} = campaign) do
+  def revoke_approval(%Campaign{} = campaign), do: locked(campaign, &do_revoke/1)
+
+  defp do_revoke(%Campaign{status: "approved"} = campaign) do
     campaign
     |> Ecto.Changeset.change(
       status: "draft",
@@ -142,33 +174,58 @@ defmodule CustomerContact.Campaigns do
     |> repo().update()
   end
 
-  def revoke_approval(%Campaign{} = campaign), do: {:ok, campaign}
+  defp do_revoke(%Campaign{} = campaign), do: {:ok, campaign}
 
-  @doc "Starts sending an approved campaign. Safe against double clicks."
+  @doc """
+  Starts sending an approved campaign. Safe against double clicks. If the
+  audience size no longer matches the approved count, approval is revoked
+  and nothing is sent.
+  """
   def start_send(%Campaign{} = campaign, actor) do
-    if Campaign.approved?(campaign) do
-      repo().transaction(fn ->
-        {count, _} =
-          from(c in Campaign,
-            where: c.id == ^campaign.id and c.status == "approved" and c.approved_hash == ^campaign.approved_hash
-          )
-          |> repo().update_all(set: [status: "sending", send_started_at: now(), sent_by: actor, updated_at: now()])
+    count = Audience.count_deliverable(campaign.segment_ids)
 
-        if count == 1 do
-          {:ok, _job} =
-            Oban.insert(
-              CustomerContact.oban(),
-              Dispatch.new(%{campaign_id: campaign.id}, queue: CustomerContact.queue())
-            )
+    result =
+      locked(campaign, fn campaign ->
+        cond do
+          not Campaign.approved?(campaign) ->
+            {:error, :not_approved}
 
-          repo().get!(Campaign, campaign.id)
-        else
-          repo().rollback(:not_approved)
+          count != campaign.approved_count ->
+            {:ok, _} = do_revoke(campaign)
+            {:ok, {:audience_changed, campaign.approved_count, count}}
+
+          true ->
+            {:ok, campaign} =
+              campaign
+              |> Ecto.Changeset.change(status: "sending", send_started_at: now(), sent_by: actor)
+              |> repo().update()
+
+            {:ok, _job} =
+              Oban.insert(
+                CustomerContact.oban(),
+                Dispatch.new(%{campaign_id: campaign.id}, queue: CustomerContact.queue())
+              )
+
+            {:ok, campaign}
         end
       end)
-    else
-      {:error, :not_approved}
+
+    case result do
+      {:ok, {:audience_changed, _, _} = reason} -> {:error, reason}
+      other -> other
     end
+  end
+
+  @doc false
+  # Stops a send that can no longer be trusted (content or audience changed).
+  def abort(campaign_id, note) do
+    from(c in Campaign, where: c.id == ^campaign_id and c.status == "sending")
+    |> repo().update_all(set: [status: "cancelled", note: note, send_completed_at: now(), updated_at: now()])
+
+    from(d in Delivery, where: d.campaign_id == ^campaign_id and d.status == "queued")
+    |> repo().update_all(set: [status: "cancelled", updated_at: now()])
+
+    :ok
   end
 
   @doc "Stops a send in progress. Deliveries already sent are unaffected."

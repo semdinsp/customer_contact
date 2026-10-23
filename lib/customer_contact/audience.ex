@@ -70,12 +70,18 @@ defmodule CustomerContact.Audience do
       ids
       |> recipients_for_segments()
       |> Enum.map(fn %Recipient{} = r -> %{r | email: normalize_email(r.email), ref: to_string(r.ref)} end)
-      |> Enum.reject(&(&1.email in [nil, ""]))
+      |> Enum.filter(&valid_email?(&1.email))
       |> Enum.uniq_by(& &1.email)
 
     suppressed = suppressed_emails(Enum.map(recipients, & &1.email))
     Enum.reject(recipients, &MapSet.member?(suppressed, &1.email))
   end
+
+  @doc "Conservative address check: one @, no whitespace, control characters or commas."
+  def valid_email?(email) when is_binary(email),
+    do: Regex.match?(~r/\A[^\s@,;<>"\x00-\x1f]+@[^\s@,;<>"\x00-\x1f]+\.[^\s@,;<>"\x00-\x1f]+\z/, email)
+
+  def valid_email?(_), do: false
 
   def count_deliverable(ids), do: length(deliverable_recipients(ids))
 

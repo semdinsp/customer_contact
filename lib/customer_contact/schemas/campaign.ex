@@ -29,6 +29,7 @@ defmodule CustomerContact.Campaign do
     field :send_started_at, :utc_datetime
     field :send_completed_at, :utc_datetime
     field :sent_by, :string
+    field :note, :string
 
     has_many :deliveries, CustomerContact.Delivery
 

@@ -49,6 +49,7 @@ defmodule CustomerContact.Migrations do
       add :send_started_at, :utc_datetime
       add :send_completed_at, :utc_datetime
       add :sent_by, :string
+      add :note, :text
       timestamps(type: :utc_datetime)
     end
 

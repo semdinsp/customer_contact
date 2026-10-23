@@ -79,6 +79,7 @@ defmodule CustomerContact.Web.ReportLive do
         </button>
         <.link navigate={@cc_base <> "/campaigns/" <> @campaign.id} class="btn btn-sm">Campaign</.link>
       </div>
+      <div :if={@campaign.note} role="alert" class="alert alert-warning mb-4" id="campaign-note">{@campaign.note}</div>
       <p class="text-sm opacity-70 mb-4">
         Subject: {@campaign.subject} · Approved by {@campaign.approved_by} · Sent by {@campaign.sent_by} · Started {format_time(
           @campaign.send_started_at

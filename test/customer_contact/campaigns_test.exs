@@ -11,6 +11,16 @@ defmodule CustomerContact.CampaignsTest do
       assert Enum.map(Audience.deliverable_recipients(["all"]), & &1.email) == ["alice@example.com"]
     end
 
+    test "invalid addresses are never deliverable" do
+      Process.put(:cc_recipients, [
+        %CustomerContact.Recipient{ref: "1", email: "a@b@c.com"},
+        %CustomerContact.Recipient{ref: "2", email: "x@y.com\r\nBcc: z@z.com"},
+        %CustomerContact.Recipient{ref: "3", email: "ok@example.com"}
+      ])
+
+      assert [%{email: "ok@example.com"}] = Audience.deliverable_recipients(["all"])
+    end
+
     test "built-in tags select recipients by ref" do
       {:ok, tag} = Audience.create_tag(%{name: "VIP"})
       Audience.tag_recipient(tag.id, "2")
@@ -96,6 +106,50 @@ defmodule CustomerContact.CampaignsTest do
 
       assert Campaigns.get_campaign!(campaign.id).status == "sent"
       assert %{sent: 2, total: 2} = Campaigns.stats(campaign.id)
+    end
+
+    test "a stale copy cannot edit or revoke a campaign that is sending" do
+      stale = approved_campaign()
+      {:ok, _} = Campaigns.start_send(stale, "s")
+      assert {:error, :not_editable} = Campaigns.update_campaign(stale, %{html_body: "<p>evil</p>"})
+      assert {:ok, %{status: "sending"}} = Campaigns.revoke_approval(stale)
+      assert %{status: "sending", approved_by: "a"} = Campaigns.get_campaign!(stale.id)
+    end
+
+    test "send refuses and revokes approval if the audience size changed" do
+      campaign = approved_campaign()
+
+      Process.put(:cc_recipients, [
+        %CustomerContact.Recipient{ref: "9", email: "new@example.com"} | CustomerContact.TestHost.list_recipients()
+      ])
+
+      assert {:error, {:audience_changed, 2, 3}} = Campaigns.start_send(campaign, "s")
+      assert %{status: "draft"} = Campaigns.get_campaign!(campaign.id)
+    end
+
+    test "dispatch aborts if the audience grew between Send and dispatch" do
+      {:ok, campaign} = Campaigns.start_send(approved_campaign(), "s")
+
+      Process.put(:cc_recipients, [
+        %CustomerContact.Recipient{ref: "9", email: "new@example.com"} | CustomerContact.TestHost.list_recipients()
+      ])
+
+      :ok = perform_job(Dispatch, %{campaign_id: campaign.id})
+      assert %{status: "cancelled", note: "Not sent: audience changed" <> _} = Campaigns.get_campaign!(campaign.id)
+      refute_email_sent()
+    end
+
+    test "deliver refuses if content changed after approval behind the workflow's back" do
+      {:ok, campaign} = Campaigns.start_send(approved_campaign(), "s")
+      :ok = perform_job(Dispatch, %{campaign_id: campaign.id})
+      Repo.update_all(from(c in Campaign, where: c.id == ^campaign.id), set: [html_body: "<p>tampered</p>"])
+
+      for d <- Repo.all(from d in Delivery, where: d.test == false) do
+        :ok = perform_job(Deliver, %{delivery_id: d.id})
+      end
+
+      refute_email_sent()
+      assert %{status: "cancelled"} = Campaigns.get_campaign!(campaign.id)
     end
 
     test "cancel stops queued deliveries" do

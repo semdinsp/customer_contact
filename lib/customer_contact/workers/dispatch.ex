@@ -23,11 +23,36 @@ defmodule CustomerContact.Workers.Dispatch do
   end
 
   defp dispatch(campaign) do
+    recipients = Audience.deliverable_recipients(campaign.segment_ids)
+
+    cond do
+      campaign.approved_hash != Campaign.approval_hash(campaign) ->
+        Campaigns.abort(campaign.id, "Not sent: content or audience changed after approval.")
+
+      length(recipients) != campaign.approved_count and not already_dispatched?(campaign) ->
+        Campaigns.abort(
+          campaign.id,
+          "Not sent: audience changed from #{campaign.approved_count} to #{length(recipients)} recipients after approval."
+        )
+
+      true ->
+        insert_and_enqueue(campaign, recipients)
+    end
+  end
+
+  # On a retry the deliveries already exist (and some may have been sent and
+  # their addresses since suppressed), so the count check only applies to the
+  # first run.
+  defp already_dispatched?(campaign) do
+    from(d in Delivery, where: d.campaign_id == ^campaign.id and d.test == false)
+    |> CustomerContact.repo().exists?()
+  end
+
+  defp insert_and_enqueue(campaign, recipients) do
     repo = CustomerContact.repo()
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    campaign.segment_ids
-    |> Audience.deliverable_recipients()
+    recipients
     |> Enum.map(fn r ->
       %{
         id: Ecto.UUID.generate(),
