@@ -41,6 +41,8 @@ defmodule CustomerContact.MixProject do
       {:req, "~> 0.5"},
       {:jason, "~> 1.2"},
       {:plug, "~> 1.16"},
+      # 2.2.1 fixes EEF-CVE-2026-105963 (secret key base in stack traces).
+      {:plug_crypto, "~> 2.2 and >= 2.2.1"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
