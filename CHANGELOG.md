@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+* Require `plug_crypto` 2.2.1 or later, which fixes advisory
+  EEF-CVE-2026-105963 (the secret key base could appear in stack traces).
+  Apps can also update it directly: `mix deps.update plug_crypto`.
+* Upgrade note for v0.1.2: `import_deps` only stops `mix format` adding
+  brackets to `customer_contact_admin`. Brackets already in the router line
+  must be removed by hand.
+
 ## v0.1.2
 
 * **Home icon.** The admin header has a home icon. Set where it goes with the
@@ -26,7 +35,8 @@
 
 Upgrading: change the dependency tag to `v0.1.2`, add `home_path:` to the
 `customer_contact_admin` call, and make sure `brand/0` has a postal address.
-No new migration.
+If the router line has brackets, `customer_contact_admin(...)`, remove them by
+hand; `mix format` won't. No new migration.
 
 ## v0.1.1
 

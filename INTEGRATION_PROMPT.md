@@ -28,7 +28,9 @@ Follow this repo's CLAUDE.md git workflow: work on a new branch
 ```
 
 Add `:customer_contact` to `import_deps` in `.formatter.exs` so `mix format`
-leaves the `customer_contact_admin` router call without parentheses.
+leaves the `customer_contact_admin` router call without parentheses. This only
+stops `mix format` adding them: if the router already has
+`customer_contact_admin(...)` with brackets, remove them by hand.
 
 The library depends on `phoenix_live_view`, `phoenix_ecto`, `ecto_sql`,
 `swoosh`, `oban (~> 2.19)` and `req`. Run `mix deps.get` and resolve any
