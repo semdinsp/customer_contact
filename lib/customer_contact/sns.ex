@@ -38,6 +38,14 @@ defmodule CustomerContact.SNS do
   @arn ~r/\Aarn:(aws|aws-cn|aws-us-gov):sns:([a-z0-9-]+):\d{12}:[A-Za-z0-9_-]+\z/
   @cert_path ~r/\A\/SimpleNotificationService-[A-Za-z0-9]+\.pem\z/
 
+  # Signed messages older than this are refused, so a captured message can't
+  # be replayed later (SNS retries well within an hour).
+  @max_age_seconds 3_600
+  # Certificates not yet cached may be fetched at most this often per
+  # minute, so forged messages naming made-up certificate files can't make
+  # the app hammer AWS. Real certificates are cached after the first fetch.
+  @cert_fetches_per_minute 10
+
   @notification_keys ~w(Message MessageId Subject Timestamp TopicArn Type)
   @subscription_keys ~w(Message MessageId SubscribeURL Timestamp Token TopicArn Type)
 
@@ -45,6 +53,7 @@ defmodule CustomerContact.SNS do
       when type in ["Notification", "SubscriptionConfirmation", "UnsubscribeConfirmation"] do
     with :ok <- check_strings(msg),
          :ok <- check_topic(arn),
+         :ok <- check_timestamp(msg["Timestamp"]),
          {:ok, host} <- sns_host(arn),
          {:ok, digest} <- digest(msg["SignatureVersion"]),
          {:ok, cert_url} <- aws_url(msg["SigningCertURL"], host, @cert_path),
@@ -60,7 +69,8 @@ defmodule CustomerContact.SNS do
   def confirm_subscription(%{"SubscribeURL" => url, "TopicArn" => arn}) do
     with {:ok, host} <- sns_host(arn),
          {:ok, url} <- aws_url(url, host, nil, allow_query: true),
-         {:ok, %{status: 200}} <- Req.get(url, retry: false, redirect: false) do
+         {:ok, %{status: 200}} <-
+           Req.get(url, retry: false, redirect: false, connect_options: [timeout: 3_000], receive_timeout: 5_000) do
       :ok
     else
       _ -> {:error, :confirm_failed}
@@ -79,6 +89,17 @@ defmodule CustomerContact.SNS do
   defp check_topic(arn) do
     if arn in CustomerContact.sns_topic_arns(), do: :ok, else: {:error, :topic_not_allowed}
   end
+
+  defp check_timestamp(timestamp) when is_binary(timestamp) do
+    with {:ok, sent_at, _} <- DateTime.from_iso8601(timestamp),
+         age when age <= @max_age_seconds and age >= -300 <- DateTime.diff(DateTime.utc_now(), sent_at) do
+      :ok
+    else
+      _ -> {:error, :stale}
+    end
+  end
+
+  defp check_timestamp(_), do: {:error, :stale}
 
   defp digest("1"), do: {:ok, :sha}
   defp digest("2"), do: {:ok, :sha256}
@@ -133,7 +154,7 @@ defmodule CustomerContact.SNS do
   defp public_key(url) do
     case :persistent_term.get({__MODULE__, url}, nil) do
       nil ->
-        with {:ok, pem} <- fetch_cert(url), {:ok, key} <- key_from_pem(pem) do
+        with :ok <- allow_cert_fetch(), {:ok, pem} <- fetch_cert(url), {:ok, key} <- key_from_pem(pem) do
           :persistent_term.put({__MODULE__, url}, key)
           {:ok, key}
         end
@@ -143,13 +164,39 @@ defmodule CustomerContact.SNS do
     end
   end
 
+  # A fixed-window counter shared by all request processes.
+  defp allow_cert_fetch do
+    counter = cert_fetch_counter()
+    window = System.monotonic_time(:second) |> div(60)
+    current = :atomics.get(counter, 1)
+
+    if current != window and :atomics.compare_exchange(counter, 1, current, window) == :ok do
+      :atomics.put(counter, 2, 0)
+    end
+
+    if :atomics.add_get(counter, 2, 1) <= @cert_fetches_per_minute, do: :ok, else: {:error, :cert_fetch_limited}
+  end
+
+  defp cert_fetch_counter do
+    case :persistent_term.get({__MODULE__, :cert_fetches}, nil) do
+      nil ->
+        counter = :atomics.new(2, signed: true)
+        :atomics.put(counter, 1, System.monotonic_time(:second) |> div(60))
+        :persistent_term.put({__MODULE__, :cert_fetches}, counter)
+        counter
+
+      counter ->
+        counter
+    end
+  end
+
   defp fetch_cert(url) do
     fetcher = Application.get_env(:customer_contact, :sns_cert_fetcher, &http_get/1)
     fetcher.(url)
   end
 
   defp http_get(url) do
-    case Req.get(url, retry: false, redirect: false) do
+    case Req.get(url, retry: false, redirect: false, connect_options: [timeout: 3_000], receive_timeout: 5_000) do
       {:ok, %{status: 200, body: body}} when is_binary(body) -> {:ok, body}
       _ -> {:error, :cert_unavailable}
     end
