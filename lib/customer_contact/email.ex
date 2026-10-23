@@ -4,13 +4,15 @@ defmodule CustomerContact.Email do
 
   Merge fields usable in the subject and HTML: `{{name}}`, `{{first_name}}`,
   `{{email}}` and `{{unsubscribe_url}}`. Values are HTML-escaped in the body.
+  A fallback after `|` is used when the value is blank, e.g.
+  `Hi {{first_name|there}},` gives "Hi there," for recipients without a name.
   """
 
   import Swoosh.Email
 
   alias CustomerContact.{Campaign, Delivery, HTMLText, Layout, Tracking}
 
-  @merge ~r/\{\{\s*([a-z_]+)\s*\}\}/
+  @merge ~r/\{\{\s*([a-z_]+)\s*(?:\|([^{}|]*))?\}\}/
 
   @doc """
   Options:
@@ -71,8 +73,8 @@ defmodule CustomerContact.Email do
   defp strip_scripts(html), do: String.replace(html, ~r/<script\b[^>]*>.*?<\/script\s*>/is, "")
 
   defp merge_html(html, delivery, unsubscribe_url) do
-    Regex.replace(@merge, html, fn whole, field ->
-      case field_value(field, delivery, unsubscribe_url) do
+    Regex.replace(@merge, html, fn whole, field, fallback ->
+      case field_value(field, delivery, unsubscribe_url, fallback) do
         nil -> whole
         value -> value |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
       end
@@ -82,12 +84,19 @@ defmodule CustomerContact.Email do
   defp merge_text(nil, _delivery), do: ""
 
   defp merge_text(text, delivery) do
-    Regex.replace(@merge, text, fn whole, field ->
-      case field_value(field, delivery, nil) do
+    Regex.replace(@merge, text, fn whole, field, fallback ->
+      case field_value(field, delivery, nil, fallback) do
         nil -> whole
         value -> single_line(value)
       end
     end)
+  end
+
+  defp field_value(field, delivery, url, fallback) do
+    case field_value(field, delivery, url) do
+      nil -> nil
+      value -> if String.trim(value) == "", do: String.trim(fallback), else: value
+    end
   end
 
   defp field_value("name", d, _), do: d.name || ""
