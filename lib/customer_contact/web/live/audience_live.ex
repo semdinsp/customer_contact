@@ -124,7 +124,7 @@ defmodule CustomerContact.Web.AudienceLive do
             <.form for={@test_form} phx-submit="add_test" class="flex flex-wrap items-end gap-2" id="test-recipient-form">
               <div class="grow"><.input field={@test_form[:email]} label="Email" type="email" /></div>
               <div class="grow"><.input field={@test_form[:name]} label="Name" /></div>
-              <button class="btn btn-sm mb-2">Add</button>
+              <button class="btn btn-sm btn-secondary mb-2">Add</button>
             </.form>
           </div>
         </section>
@@ -138,7 +138,7 @@ defmodule CustomerContact.Web.AudienceLive do
             </p>
             <form phx-submit="suppress" class="flex gap-2">
               <input type="email" name="email" placeholder="email@example.com" class="input input-sm" required />
-              <button class="btn btn-sm">Suppress</button>
+              <button class="btn btn-sm btn-secondary">Suppress</button>
             </form>
             <div class="overflow-x-auto max-h-80">
               <table class="table table-xs">
@@ -171,7 +171,7 @@ defmodule CustomerContact.Web.AudienceLive do
             <.form for={@tag_form} phx-submit="create_tag" class="flex flex-wrap items-end gap-2" id="tag-form">
               <div><.input field={@tag_form[:name]} label="New tag" /></div>
               <div class="grow"><.input field={@tag_form[:description]} label="Description" /></div>
-              <button class="btn btn-sm mb-2">Create</button>
+              <button class="btn btn-sm btn-secondary mb-2">Create</button>
             </.form>
             <div class="flex flex-wrap gap-2">
               <span :for={t <- @tags} class="badge badge-outline gap-1">

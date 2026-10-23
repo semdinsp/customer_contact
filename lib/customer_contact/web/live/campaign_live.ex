@@ -189,7 +189,7 @@ defmodule CustomerContact.Web.CampaignLive do
         <.link
           :if={@campaign.status in ~w(sending sent cancelled)}
           navigate={@cc_base <> "/campaigns/" <> @campaign.id <> "/report"}
-          class="btn btn-sm"
+          class="btn btn-sm btn-outline"
         >
           View report
         </.link>
@@ -268,7 +268,12 @@ defmodule CustomerContact.Web.CampaignLive do
                   Content changed since the last test.
                 </p>
                 <div>
-                  <button phx-click="send_test" class="btn btn-sm" id="send-test" disabled={@test_recipients == []}>
+                  <button
+                    phx-click="send_test"
+                    class="btn btn-sm btn-secondary"
+                    id="send-test"
+                    disabled={@test_recipients == []}
+                  >
                     Send test
                   </button>
                 </div>
