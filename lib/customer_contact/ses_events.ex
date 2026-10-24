@@ -9,16 +9,58 @@ defmodule CustomerContact.SESEvents do
 
   import Ecto.Query
 
-  alias CustomerContact.{Audience, Delivery, Tracking}
+  alias CustomerContact.{Audience, Delivery, Log, Sender, Tracking}
 
   def handle(%{"mail" => %{"messageId" => message_id}} = event) do
     type = event["eventType"] || event["notificationType"]
     deliveries = CustomerContact.repo().all(from d in Delivery, where: d.provider_message_id == ^message_id)
-    Enum.each(deliveries, &apply_event(type, &1, event))
+
+    if deliveries == [] do
+      # e.g. the app's own transactional mail, if it uses the same configuration set
+      Log.info("SES #{type} for an email that isn't a campaign delivery",
+        ses_message_id: message_id,
+        to: event |> get_in(["mail", "destination"]) |> mask_all()
+      )
+    end
+
+    Enum.each(deliveries, fn delivery ->
+      log_event(type, delivery, message_id, event)
+      apply_event(type, delivery, event)
+    end)
+
     :ok
   end
 
   def handle(_), do: :ok
+
+  defp log_event(type, delivery, message_id, event) do
+    meta = Sender.log_meta(delivery) ++ [ses_message_id: message_id]
+
+    case type do
+      "Delivery" ->
+        Log.info("SES Delivery", meta)
+
+      "Bounce" ->
+        bounce = event["bounce"] || %{}
+        Log.warning("SES Bounce", meta ++ [type: bounce["bounceType"], subtype: bounce["bounceSubType"]])
+
+      "Complaint" ->
+        Log.warning("SES Complaint", meta ++ [feedback: get_in(event, ["complaint", "complaintFeedbackType"])])
+
+      "Reject" ->
+        Log.warning("SES Reject", meta ++ [reason: get_in(event, ["reject", "reason"])])
+
+      "Rendering Failure" ->
+        Log.warning("SES Rendering Failure", meta ++ [error: get_in(event, ["failure", "errorMessage"])])
+
+      # "Send" etc. would only repeat the "sent email" line.
+      _ ->
+        :ok
+    end
+  end
+
+  defp mask_all(emails) when is_list(emails), do: Enum.map_join(emails, ",", &Log.mask_email/1)
+  defp mask_all(_), do: nil
 
   defp apply_event("Delivery", delivery, event) do
     set_status(delivery, ["sent"], status: "delivered", delivered_at: now())

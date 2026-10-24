@@ -13,7 +13,7 @@ defmodule CustomerContact.Workers.Deliver do
 
   import Ecto.Query
 
-  alias CustomerContact.{Audience, Campaign, Campaigns, Delivery, Sender}
+  alias CustomerContact.{Audience, Campaign, Campaigns, Delivery, Log, Sender}
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"delivery_id" => delivery_id}} = job) do
@@ -45,6 +45,7 @@ defmodule CustomerContact.Workers.Deliver do
 
       Audience.suppressed?(delivery.email) ->
         Sender.mark(delivery, status: "cancelled", error: "suppressed before send")
+        Log.info("skipped email: address suppressed since dispatch", Sender.log_meta(delivery))
         :ok
 
       true ->
@@ -53,11 +54,16 @@ defmodule CustomerContact.Workers.Deliver do
             :ok
 
           {:error, message} ->
-            if job.attempt >= job.max_attempts do
+            last_attempt? = job.attempt >= job.max_attempts
+            attempt = Enum.join([job.attempt, job.max_attempts], "/")
+
+            if last_attempt? do
               Sender.mark(delivery, status: "failed", error: message)
+              Log.error("email failed, giving up", Sender.log_meta(delivery) ++ [attempt: attempt])
               :ok
             else
               Sender.mark(delivery, status: "queued", error: message)
+              Log.warning("email failed, will retry", Sender.log_meta(delivery) ++ [attempt: attempt])
               {:error, message}
             end
         end

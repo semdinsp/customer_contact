@@ -16,9 +16,7 @@ defmodule CustomerContact.Web.PublicPlug do
 
   use Plug.Router
 
-  require Logger
-
-  alias CustomerContact.{SESEvents, SNS, Tracking}
+  alias CustomerContact.{Log, Sender, SESEvents, SNS, Tracking}
 
   @pixel Base.decode64!("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
   @max_body 256_000
@@ -75,10 +73,11 @@ defmodule CustomerContact.Web.PublicPlug do
       {:ok, delivery} ->
         case Tracking.record_unsubscribe(delivery) do
           :ok ->
+            Log.info("unsubscribed", Sender.log_meta(delivery))
             page(conn, 200, "Unsubscribed", "#{delivery.email} will no longer receive these emails.")
 
           :error ->
-            Logger.error("CustomerContact could not unsubscribe delivery #{delivery.id}")
+            Log.error("could not unsubscribe", Sender.log_meta(delivery))
             page(conn, 500, "Something went wrong", "Please reply to the email and ask to be unsubscribed.")
         end
 
@@ -95,15 +94,15 @@ defmodule CustomerContact.Web.PublicPlug do
     else
       # Temporary: a 5xx makes SNS retry the message later.
       {:error, reason} when reason in [:cert_fetch_limited, :cert_unavailable] ->
-        Logger.warning("CustomerContact could not verify SNS message yet: #{inspect(reason)}")
+        Log.warning("could not verify SNS message yet: #{inspect(reason)}")
         send_resp(conn, 503, "try again")
 
       {:error, reason} ->
-        Logger.warning("CustomerContact rejected SNS message: #{inspect(reason)}")
+        Log.warning("rejected SNS message: #{inspect(reason)}")
         send_resp(conn, 403, "forbidden")
 
       {:error, reason, conn} ->
-        Logger.warning("CustomerContact rejected SNS message: #{inspect(reason)}")
+        Log.warning("rejected SNS message: #{inspect(reason)}")
         send_resp(conn, 400, "bad request")
     end
   end
@@ -136,8 +135,8 @@ defmodule CustomerContact.Web.PublicPlug do
 
   defp handle_sns(%{"Type" => "SubscriptionConfirmation"} = msg) do
     case SNS.confirm_subscription(msg) do
-      :ok -> Logger.info("CustomerContact confirmed SNS subscription to #{msg["TopicArn"]}")
-      error -> Logger.warning("CustomerContact could not confirm SNS subscription: #{inspect(error)}")
+      :ok -> Log.info("confirmed SNS subscription to #{msg["TopicArn"]}")
+      error -> Log.warning("could not confirm SNS subscription: #{inspect(error)}")
     end
   end
 
@@ -153,7 +152,7 @@ defmodule CustomerContact.Web.PublicPlug do
   defp safely(fun) do
     fun.()
   rescue
-    e -> Logger.error("CustomerContact tracking error: " <> Exception.message(e))
+    e -> Log.error("tracking error: " <> Exception.message(e))
   end
 
   defp brand_name do
