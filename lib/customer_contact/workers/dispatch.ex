@@ -9,7 +9,7 @@ defmodule CustomerContact.Workers.Dispatch do
 
   import Ecto.Query
 
-  alias CustomerContact.{Audience, Campaign, Campaigns, Delivery}
+  alias CustomerContact.{Audience, Campaign, Campaigns, Delivery, Log}
   alias CustomerContact.Workers.Deliver
 
   @chunk 500
@@ -72,8 +72,16 @@ defmodule CustomerContact.Workers.Dispatch do
     |> Enum.chunk_every(@chunk)
     |> Enum.each(&repo.insert_all(Delivery, &1, on_conflict: :nothing))
 
-    from(d in Delivery, where: d.campaign_id == ^campaign.id and d.test == false and d.status == "queued", select: d.id)
-    |> repo.all()
+    queued =
+      from(d in Delivery,
+        where: d.campaign_id == ^campaign.id and d.test == false and d.status == "queued",
+        select: d.id
+      )
+      |> repo.all()
+
+    Log.info("dispatching campaign", campaign_id: campaign.id, recipients: length(recipients), queued: length(queued))
+
+    queued
     |> Enum.map(&Deliver.new(%{delivery_id: &1}, queue: CustomerContact.queue()))
     |> Enum.chunk_every(@chunk)
     |> Enum.each(&Oban.insert_all(CustomerContact.oban(), &1))

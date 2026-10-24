@@ -152,6 +152,31 @@ defmodule CustomerContact.CampaignsTest do
       assert %{sent: 2, total: 2} = Campaigns.stats(campaign.id)
     end
 
+    test "logs each step of a send without full email addresses" do
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :info], fn ->
+          campaign = approved_campaign()
+          {:ok, campaign} = Campaigns.start_send(campaign, "sender@example.test")
+          :ok = perform_job(Dispatch, %{campaign_id: campaign.id})
+
+          for d <- Repo.all(from d in Delivery, where: d.test == false) do
+            :ok = perform_job(Deliver, %{delivery_id: d.id})
+          end
+        end)
+
+      assert log =~ "[CustomerContact] test send finished"
+      assert log =~ "[CustomerContact] campaign approved"
+      assert log =~ "[CustomerContact] send started"
+      assert log =~ ~r/\[CustomerContact\] dispatching campaign .*queued=2/
+      assert log =~ ~r/\[CustomerContact\] sent email .*delivery_id=\S+ to=a\*\*\*@example\.com test=false/
+      assert log =~ ~r/\[CustomerContact\] campaign sent .*sent=2/
+      refute log =~ "alice@example.com"
+      refute log =~ "bob@example.com"
+    end
+
     test "a stale copy cannot edit or revoke a campaign that is sending" do
       stale = approved_campaign()
       {:ok, _} = Campaigns.start_send(stale, "s")

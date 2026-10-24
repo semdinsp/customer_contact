@@ -118,10 +118,32 @@ defmodule CustomerContact.Web.PublicPlugTest do
       assert Audience.suppressed?("jo@example.com")
     end
 
-    test "delivery event marks delivered", %{key: key, delivery: d} do
+    test "delivery event marks delivered and is logged", %{key: key, delivery: d} do
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
       event = %{"eventType" => "Delivery", "mail" => %{"messageId" => "ses-msg-1"}, "delivery" => %{}}
-      assert response(post_sns(sns_message(key, event)), 200)
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :info], fn -> assert response(post_sns(sns_message(key, event)), 200) end)
+
       assert %{status: "delivered"} = Repo.get!(Delivery, d.id)
+
+      assert log =~
+               "[CustomerContact] SES Delivery campaign_id=#{d.campaign_id} delivery_id=#{d.id} to=j***@example.com"
+
+      assert log =~ "ses_message_id=ses-msg-1"
+    end
+
+    test "events for emails that aren't campaign deliveries are logged", %{key: key} do
+      Logger.configure(level: :info)
+      on_exit(fn -> Logger.configure(level: :warning) end)
+      event = %{"eventType" => "Bounce", "mail" => %{"messageId" => "other-msg", "destination" => ["pat@example.org"]}}
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :info], fn -> assert response(post_sns(sns_message(key, event)), 200) end)
+
+      assert log =~
+               "SES Bounce for an email that isn't a campaign delivery ses_message_id=other-msg to=p***@example.org"
     end
 
     test "tampered message is rejected", %{key: key, delivery: d} do

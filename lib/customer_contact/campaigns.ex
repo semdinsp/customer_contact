@@ -12,7 +12,7 @@ defmodule CustomerContact.Campaigns do
 
   import Ecto.Query
 
-  alias CustomerContact.{Audience, Campaign, Delivery, Sender}
+  alias CustomerContact.{Audience, Campaign, Delivery, Log, Sender}
   alias CustomerContact.Workers.Dispatch
 
   def list_campaigns, do: repo().all(from c in Campaign, order_by: [desc: c.inserted_at])
@@ -102,6 +102,15 @@ defmodule CustomerContact.Campaigns do
         end
       end)
 
+    failed = Enum.count(results, &match?({_, {:error, _}}, &1))
+
+    Log.info("test send finished",
+      campaign_id: campaign.id,
+      by: actor,
+      sent: length(results) - failed,
+      failed: failed
+    )
+
     if Enum.any?(results, &match?({_, :ok}, &1)) do
       tested_hash = Campaign.content_hash(campaign)
 
@@ -168,6 +177,7 @@ defmodule CustomerContact.Campaigns do
             approved_by: actor
           )
           |> repo().update()
+          |> tap(fn _ -> Log.info("campaign approved", campaign_id: campaign.id, by: actor, recipients: count) end)
       end
     end)
   end
@@ -175,6 +185,8 @@ defmodule CustomerContact.Campaigns do
   def revoke_approval(%Campaign{} = campaign), do: locked(campaign, &do_revoke/1)
 
   defp do_revoke(%Campaign{status: "approved"} = campaign) do
+    Log.info("approval revoked", campaign_id: campaign.id)
+
     campaign
     |> Ecto.Changeset.change(
       status: "draft",
@@ -210,6 +222,12 @@ defmodule CustomerContact.Campaigns do
             {:error, :missing_postal_address}
 
           count != campaign.approved_count ->
+            Log.warning("send refused: audience changed since approval",
+              campaign_id: campaign.id,
+              approved: campaign.approved_count,
+              now: count
+            )
+
             {:ok, _} = do_revoke(campaign)
             {:ok, {:audience_changed, campaign.approved_count, count}}
 
@@ -225,6 +243,7 @@ defmodule CustomerContact.Campaigns do
                 Dispatch.new(%{campaign_id: campaign.id}, queue: CustomerContact.queue())
               )
 
+            Log.info("send started", campaign_id: campaign.id, by: actor, recipients: count)
             {:ok, campaign}
         end
       end)
@@ -238,6 +257,8 @@ defmodule CustomerContact.Campaigns do
   @doc false
   # Stops a send that can no longer be trusted (content or audience changed).
   def abort(campaign_id, note) do
+    Log.warning("send stopped", campaign_id: campaign_id, reason: note)
+
     from(c in Campaign, where: c.id == ^campaign_id and c.status == "sending")
     |> repo().update_all(set: [status: "cancelled", note: note, send_completed_at: now(), updated_at: now()])
 
@@ -256,6 +277,7 @@ defmodule CustomerContact.Campaigns do
       from(d in Delivery, where: d.campaign_id == ^campaign.id and d.status == "queued")
       |> repo().update_all(set: [status: "cancelled", updated_at: now()])
 
+      Log.info("send cancelled", campaign_id: campaign.id)
       repo().get!(Campaign, campaign.id)
     end)
   end
@@ -271,8 +293,20 @@ defmodule CustomerContact.Campaigns do
       |> repo().exists?()
 
     unless pending do
-      from(c in Campaign, where: c.id == ^campaign_id and c.status == "sending")
-      |> repo().update_all(set: [status: "sent", send_completed_at: now(), updated_at: now()])
+      {completed, _} =
+        from(c in Campaign, where: c.id == ^campaign_id and c.status == "sending")
+        |> repo().update_all(set: [status: "sent", send_completed_at: now(), updated_at: now()])
+
+      if completed == 1 do
+        stats = stats(campaign_id)
+
+        Log.info("campaign sent",
+          campaign_id: campaign_id,
+          sent: stats.sent,
+          failed: stats.failed,
+          cancelled: stats.cancelled
+        )
+      end
     end
 
     :ok

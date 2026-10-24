@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.1.3
+
+* **Logging.** Campaign steps (test send, approve, send started, dispatch,
+  stopped, cancelled, finished), every email sent, retried or failed, every
+  SES delivery, bounce, complaint and reject, and unsubscribes are logged.
+  Lines start with `[CustomerContact]` and include `campaign_id`,
+  `delivery_id` and `ses_message_id`. Recipient addresses are masked
+  (`a***@example.com`). See "Logging" in the README.
 
 * Require `plug_crypto` 2.2.1 or later, which fixes advisory
   EEF-CVE-2026-105963 (the secret key base could appear in stack traces).

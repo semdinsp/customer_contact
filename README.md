@@ -118,13 +118,41 @@ Results are stored in the app's database (`cc_deliveries`, `cc_events`,
 `cc_suppressions`), so the app can query them directly or use
 `CustomerContact.Campaigns.stats/1` and `list_deliveries/2`.
 
+## Logging
+
+Every step is written to the app's log, so a send can be debugged from the
+Fly logs (`fly logs`, or the dashboard) as well as from the report page:
+
+```
+[CustomerContact] send started campaign_id=… by=admin@example.com recipients=412
+[CustomerContact] dispatching campaign campaign_id=… recipients=412 queued=412
+[CustomerContact] sent email campaign_id=… delivery_id=… to=a***@example.com test=false ses_message_id=0100018f…
+[CustomerContact] SES Delivery campaign_id=… delivery_id=… to=a***@example.com test=false ses_message_id=0100018f…
+[CustomerContact] SES Bounce campaign_id=… delivery_id=… to=b***@example.org test=false ses_message_id=… type=Permanent subtype=General
+[CustomerContact] campaign sent campaign_id=… sent=410 failed=0 cancelled=2
+```
+
+* Search for `[CustomerContact]` for everything, or for a `campaign_id`,
+  `delivery_id` or `ses_message_id` to follow one campaign or email. The SES
+  message id is the same one SES shows and the one Swoosh returns.
+* Info: test sends, approvals, sends started and finished, each email sent,
+  each SES delivery, unsubscribes, and SES events for emails that aren't
+  campaign deliveries. Warning: retries, bounces, complaints, rejects,
+  stopped sends and rejected SNS messages. Error: emails that failed for good.
+* Addresses are masked (`a***@example.com`); the full address is on the
+  report page. The ids are also Logger metadata (plus `customer_contact:
+  true`) for apps that log structured metadata.
+* Two lines per recipient at `:info` can be a lot for big lists. To keep only
+  problems, add `Logger.put_module_level(CustomerContact.Log, :warning)` to
+  the app's `Application.start/2`.
+
 ## Setup in an app (summary)
 
 [`INTEGRATION_PROMPT.md`](INTEGRATION_PROMPT.md) has the full steps. In short:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.2"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.3"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)
