@@ -19,7 +19,9 @@ in [`CHANGELOG.md`](CHANGELOG.md).
 
 The pages live wherever the app mounts them (usually `/admin/contact`). The
 header has a home icon back to the app's admin dashboard, and tabs for
-Campaigns and Audience.
+Campaigns and Audience. Messages (saved, test sent, why something was
+refused) appear at the top of the page and pinned to the bottom corner of the
+screen.
 
 * **Campaigns** lists every campaign with its status and, once sent, how many
   were sent, opened and clicked.
@@ -135,7 +137,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 * Search for `[CustomerContact]` for everything, or for a `campaign_id`,
   `delivery_id` or `ses_message_id` to follow one campaign or email. The SES
   message id is the same one SES shows and the one Swoosh returns.
-* Info: test sends, approvals, sends started and finished, each email sent,
+* Info: test sends, approvals, refused clicks (with the reason), sends started and finished, each email sent,
   each SES delivery, unsubscribes, and SES events for emails that aren't
   campaign deliveries. Warning: retries, bounces, complaints, rejects,
   stopped sends and rejected SNS messages. Error: emails that failed for good.
@@ -152,7 +154,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.3"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.4"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)

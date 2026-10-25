@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.4
+
+* **Messages you can't miss.** Admin messages (e.g. "Add a subject first.")
+  also appear pinned to the bottom corner of the screen, with a dismiss
+  button, so they're visible however far down the page the admin clicked.
+  They still appear at the top as before.
+* **Refusals are logged.** A refused test send, approval or send logs
+  `[CustomerContact] <action> refused campaign_id=… by=… reason=…` at info.
+
 ## v0.1.3
 
 * **Logging.** Campaign steps (test send, approve, send started, dispatch,
