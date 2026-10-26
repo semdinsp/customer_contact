@@ -77,6 +77,7 @@ defmodule CustomerContact.Campaigns do
       test_recipients == [] -> {:error, :no_test_recipients}
       true -> do_send_test(campaign, test_recipients, actor)
     end
+    |> log_refusal("test send", campaign.id, actor)
   end
 
   defp do_send_test(campaign, test_recipients, actor) do
@@ -142,7 +143,8 @@ defmodule CustomerContact.Campaigns do
   content they haven't looked at.
   """
   def approve(%Campaign{} = seen, actor, typed_count) do
-    locked(seen, fn campaign ->
+    seen
+    |> locked(fn campaign ->
       count = Audience.count_deliverable(campaign.segment_ids)
 
       cond do
@@ -180,6 +182,7 @@ defmodule CustomerContact.Campaigns do
           |> tap(fn _ -> Log.info("campaign approved", campaign_id: campaign.id, by: actor, recipients: count) end)
       end
     end)
+    |> log_refusal("approval", seen.id, actor)
   end
 
   def revoke_approval(%Campaign{} = campaign), do: locked(campaign, &do_revoke/1)
@@ -252,7 +255,24 @@ defmodule CustomerContact.Campaigns do
       {:ok, {:audience_changed, _, _} = reason} -> {:error, reason}
       other -> other
     end
+    |> log_refusal("send", seen.id, actor)
   end
+
+  # Refused clicks only show the admin a message, so log them too: otherwise
+  # "I clicked and nothing happened" leaves no trace.
+  defp log_refusal({:error, reason} = result, action, campaign_id, actor) do
+    Log.info("#{action} refused", campaign_id: campaign_id, by: actor, reason: refusal_reason(reason))
+    result
+  end
+
+  defp log_refusal(result, _action, _campaign_id, _actor), do: result
+
+  # Test send failures carry per-recipient results; log only the count.
+  defp refusal_reason({:send_failed, results}), do: "send_failed to #{length(results)} test recipients"
+  defp refusal_reason({reason, _, _}) when is_atom(reason), do: Atom.to_string(reason)
+  defp refusal_reason({reason, _}) when is_atom(reason), do: Atom.to_string(reason)
+  defp refusal_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp refusal_reason(_), do: "other"
 
   @doc false
   # Stops a send that can no longer be trusted (content or audience changed).

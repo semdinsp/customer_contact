@@ -4,6 +4,8 @@ defmodule CustomerContact.Web.Components do
   # daisyUI classes; the host's app.css must @source this library.
   use Phoenix.Component
 
+  alias Phoenix.LiveView.JS
+
   attr :flash, :map, required: true
   attr :base, :string, required: true
   attr :home, :string, default: "/"
@@ -49,6 +51,37 @@ defmodule CustomerContact.Web.Components do
         {msg}
       </div>
       {render_slot(@inner_block)}
+      <%!-- The same messages, pinned to the corner of the screen: the buttons that
+           cause them are often scrolled well below the alerts above. --%>
+      <div class="toast toast-end toast-bottom z-50">
+        <.toast flash={@flash} kind={:info} class="alert-success" />
+        <.toast flash={@flash} kind={:error} class="alert-error" />
+      </div>
+    </div>
+    """
+  end
+
+  attr :flash, :map, required: true
+  attr :kind, :atom, required: true
+  attr :class, :string, required: true
+
+  defp toast(assigns) do
+    ~H"""
+    <div
+      :if={msg = Phoenix.Flash.get(@flash, @kind)}
+      role="alert"
+      class={["alert shadow-lg max-w-sm", @class]}
+      id={"cc-toast-#{@kind}"}
+    >
+      <span>{msg}</span>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        aria-label="Dismiss"
+        phx-click={JS.push("lv:clear-flash", value: %{key: @kind})}
+      >
+        ✕
+      </button>
     </div>
     """
   end
