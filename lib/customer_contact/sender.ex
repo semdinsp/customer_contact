@@ -47,9 +47,13 @@ defmodule CustomerContact.Sender do
   defp message_id(%{"id" => id}) when is_binary(id), do: id
   defp message_id(_), do: nil
 
-  defp format_error({_code, %{} = body}), do: inspect(body) |> String.slice(0, 500)
-  defp format_error(reason) when is_binary(reason), do: String.slice(reason, 0, 500)
-  defp format_error(reason), do: inspect(reason) |> String.slice(0, 500)
+  # Mailer errors often quote the recipient ("... failed the check: Jane <jane@x.com>"),
+  # and this text reaches the logs and Oban's job table.
+  defp format_error(reason), do: reason |> error_text() |> Log.mask_emails() |> String.slice(0, 500)
+
+  defp error_text({_code, %{} = body}), do: inspect(body)
+  defp error_text(reason) when is_binary(reason), do: reason
+  defp error_text(reason), do: inspect(reason)
 
   defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 end
