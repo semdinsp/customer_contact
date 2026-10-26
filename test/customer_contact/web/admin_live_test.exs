@@ -79,6 +79,17 @@ defmodule CustomerContact.Web.AdminLiveTest do
     assert render(view) =~ "Donors"
   end
 
+  test "every admin page has a help guide behind the same help icon" do
+    test_recipient_fixture()
+    campaign = campaign_fixture()
+
+    for path <- ["", "/audience", "/campaigns/new", "/campaigns/#{campaign.id}"] do
+      {:ok, view, _} = live(admin_conn(), "/admin/contact" <> path)
+      assert has_element?(view, "#cc-help-toggle[aria-controls=cc-help]"), path
+      assert has_element?(view, "#cc-help.hidden", "How this page works"), path
+    end
+  end
+
   test "audience page unsubscribes a person in one click" do
     {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
     assert view |> element("#unsubscribe-2") |> render_click() =~ "Unsubscribed bob@example.com"

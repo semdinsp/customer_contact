@@ -113,6 +113,30 @@ defmodule CustomerContact.Web.AudienceLive do
   def render(assigns) do
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:audience}>
+      <:help>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>
+            <strong>Segments</strong>
+            are the groups you can send a campaign to. <em>Everyone</em>
+            is all customers with an email address.
+          </li>
+          <li>
+            <strong>Test recipients</strong>
+            get every test send. Add yourself and anyone who should check an email before it goes out.
+            They don't get the real send unless they are also customers.
+          </li>
+          <li :if={!@host_segments}>
+            <strong>Tags</strong>
+            make your own groups: create a tag, then tick people in the table. The tag then appears as a segment.
+          </li>
+          <li>
+            <strong>To stop emailing someone</strong>,
+            <span :if={!@host_segments}>click <em>Unsubscribe</em> beside them in the people table, or</span>
+            add their address to the <strong>suppression list</strong>. People who unsubscribe themselves, bounce or complain are added automatically.
+            Only remove someone from the list if they've asked to be emailed again.
+          </li>
+        </ul>
+      </:help>
       <div class="grid gap-6 lg:grid-cols-2">
         <section class="card bg-base-200">
           <div class="card-body p-4">
