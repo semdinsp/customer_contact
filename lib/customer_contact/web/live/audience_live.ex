@@ -65,7 +65,8 @@ defmodule CustomerContact.Web.AudienceLive do
   end
 
   def handle_event("unsubscribe", %{"ref" => ref}, socket) do
-    with %{email: email} when is_binary(email) <- Enum.find(socket.assigns.recipients, &(to_string(&1.ref) == ref)),
+    with %{email: email} when is_binary(email) <-
+           Enum.find(socket.assigns[:recipients] || [], &(to_string(&1.ref) == ref)),
          {:ok, _} <- Audience.suppress(email, "manual", "Unsubscribed by #{socket.assigns.cc_actor}") do
       Log.info("unsubscribed by admin", to: Log.mask_email(email), by: socket.assigns.cc_actor)
       {:noreply, socket |> put_flash(:info, "Unsubscribed #{email}. Campaigns won't email them.") |> load()}

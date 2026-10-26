@@ -107,7 +107,9 @@ defmodule CustomerContact.Audience do
     |> repo().insert(on_conflict: :nothing, conflict_target: :email)
   end
 
-  def delete_suppression(id), do: repo().delete_all(from s in Suppression, where: s.id == ^id)
+  def delete_suppression(id) do
+    if valid_uuid?(id), do: repo().delete_all(from s in Suppression, where: s.id == ^id), else: {0, nil}
+  end
 
   ## Test recipients
 
@@ -117,7 +119,9 @@ defmodule CustomerContact.Audience do
 
   def change_test_recipient(attrs \\ %{}), do: TestRecipient.changeset(%TestRecipient{}, attrs)
 
-  def delete_test_recipient(id), do: repo().delete_all(from t in TestRecipient, where: t.id == ^id)
+  def delete_test_recipient(id) do
+    if valid_uuid?(id), do: repo().delete_all(from t in TestRecipient, where: t.id == ^id), else: {0, nil}
+  end
 
   ## Built-in tags
 

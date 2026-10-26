@@ -123,4 +123,20 @@ defmodule CustomerContact.Web.AdminLiveTest do
     {:ok, _view, html} = live(admin_conn(), "/admin/contact/sent?email=%25&status=nonsense&campaign=nope")
     assert html =~ "No emails match."
   end
+
+  test "tampered admin events are refused without crashing the page" do
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+    render_click(view, "delete_test", %{"id" => "not-a-uuid"})
+    render_click(view, "unsuppress", %{"id" => "not-a-uuid"})
+    assert render_click(view, "unsubscribe", %{"ref" => "no-such-ref"}) =~ "Couldn&#39;t unsubscribe"
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/new")
+
+    for event <- ~w(send_test approve revoke send) do
+      assert render_click(view, event, %{}) =~ "Save the campaign first."
+    end
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/#{campaign_fixture().id}")
+    assert render_click(view, "approve", %{}) =~ "alert"
+  end
 end

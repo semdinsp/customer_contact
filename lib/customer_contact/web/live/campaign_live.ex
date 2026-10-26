@@ -77,6 +77,11 @@ defmodule CustomerContact.Web.CampaignLive do
     end
   end
 
+  def handle_event(event, _params, %{assigns: %{campaign: %{id: nil}}} = socket)
+      when event in ~w(send_test approve revoke send) do
+    {:noreply, put_flash(socket, :error, "Save the campaign first.")}
+  end
+
   def handle_event("send_test", _params, socket) do
     if socket.assigns.dirty do
       {:noreply, put_flash(socket, :error, "Save your changes before sending a test.")}
@@ -112,6 +117,8 @@ defmodule CustomerContact.Web.CampaignLive do
       end
     end
   end
+
+  def handle_event("approve", _params, socket), do: handle_event("approve", %{"count" => ""}, socket)
 
   def handle_event("revoke", _params, socket) do
     {:ok, campaign} = Campaigns.revoke_approval(socket.assigns.campaign)
