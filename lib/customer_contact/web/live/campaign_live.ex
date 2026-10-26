@@ -140,6 +140,24 @@ defmodule CustomerContact.Web.CampaignLive do
     end
   end
 
+  def handle_event("duplicate", _params, socket) do
+    cond do
+      socket.assigns.campaign.id == nil ->
+        {:noreply, put_flash(socket, :error, "Save the campaign first.")}
+
+      socket.assigns.dirty ->
+        {:noreply, put_flash(socket, :error, "Save your changes before duplicating.")}
+
+      true ->
+        {:ok, copy} = Campaigns.duplicate_campaign(socket.assigns.campaign, socket.assigns.cc_actor)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Duplicated. This is the new copy: edit it, then test and approve it as usual.")
+         |> push_navigate(to: socket.assigns.cc_base <> "/campaigns/" <> copy.id)}
+    end
+  end
+
   def handle_event("delete", _params, socket) do
     case Campaigns.delete_campaign(socket.assigns.campaign) do
       {:ok, _} ->
@@ -231,6 +249,16 @@ defmodule CustomerContact.Web.CampaignLive do
         <.status_badge :if={@campaign.id} status={@campaign.status} />
         <span :if={@dirty} class="badge badge-warning">unsaved changes</span>
         <div class="grow"></div>
+        <button
+          :if={@campaign.id}
+          type="button"
+          phx-click="duplicate"
+          class="btn btn-sm btn-outline"
+          id="duplicate-campaign"
+          title="Create a new draft from this campaign"
+        >
+          <.icon name="copy" /> Duplicate
+        </button>
         <.link
           :if={@campaign.status in ~w(sending sent cancelled)}
           navigate={@cc_base <> "/campaigns/" <> @campaign.id <> "/report"}

@@ -139,4 +139,27 @@ defmodule CustomerContact.Web.AdminLiveTest do
     {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/#{campaign_fixture().id}")
     assert render_click(view, "approve", %{}) =~ "alert"
   end
+
+  test "duplicate makes a new draft with the same content and no history" do
+    test_recipient_fixture()
+    {:ok, original, _} = CustomerContact.Campaigns.send_test(campaign_fixture(), "a")
+    {:ok, original} = CustomerContact.Campaigns.approve(original, "a", "2")
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/#{original.id}")
+    {:error, {:live_redirect, %{to: to}}} = view |> element("#duplicate-campaign") |> render_click()
+    "/admin/contact/campaigns/" <> copy_id = to
+    copy = CustomerContact.Campaigns.get_campaign!(copy_id)
+
+    assert copy.name == "Copy of " <> original.name
+
+    assert {copy.subject, copy.html_body, copy.layout, copy.segment_ids} ==
+             {original.subject, original.html_body, original.layout, original.segment_ids}
+
+    assert %{status: "draft", tested_at: nil, approved_by: nil} = copy
+    assert CustomerContact.Campaigns.get_campaign!(original.id).status == "approved"
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact")
+    {:error, {:live_redirect, _}} = view |> element("#duplicate-#{original.id}") |> render_click()
+    assert length(CustomerContact.Campaigns.list_campaigns()) == 3
+  end
 end

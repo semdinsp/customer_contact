@@ -17,6 +17,22 @@ defmodule CustomerContact.Web.CampaignsLive do
   end
 
   @impl true
+  def handle_event("duplicate", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.campaigns, fn {c, _} -> c.id == id end) do
+      {campaign, _} ->
+        {:ok, copy} = Campaigns.duplicate_campaign(campaign, socket.assigns.cc_actor)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Duplicated. This is the new copy: edit it, then test and approve it as usual.")
+         |> push_navigate(to: socket.assigns.cc_base <> "/campaigns/" <> copy.id)}
+
+      nil ->
+        {:noreply, put_flash(socket, :error, "That campaign no longer exists.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
@@ -38,6 +54,10 @@ defmodule CustomerContact.Web.CampaignsLive do
           </li>
         </ol>
         <p>Changing the email after a test or approval sends it back a step, so customers only ever get what was tested.</p>
+        <p>
+          To reuse an earlier email, click <strong>Duplicate</strong>: it makes a new draft with the same content and audience,
+          which you then test, approve and send as usual.
+        </p>
       </:help>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold">Campaigns</h2>
@@ -76,6 +96,16 @@ defmodule CustomerContact.Web.CampaignsLive do
                 <.link :if={stats} navigate={@cc_base <> "/campaigns/" <> c.id <> "/report"} class="btn btn-ghost btn-xs">
                   <.icon name="report" /> Report
                 </.link>
+                <button
+                  type="button"
+                  phx-click="duplicate"
+                  phx-value-id={c.id}
+                  class="btn btn-ghost btn-xs"
+                  id={"duplicate-#{c.id}"}
+                  title="Create a new draft from this campaign"
+                >
+                  <.icon name="copy" /> Duplicate
+                </button>
               </td>
             </tr>
           </tbody>
