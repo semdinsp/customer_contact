@@ -24,7 +24,7 @@ Follow this repo's CLAUDE.md git workflow: work on a new branch
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.5"},
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.6"},
 ```
 
 Add `:customer_contact` to `import_deps` in `.formatter.exs` so `mix format`
@@ -114,6 +114,11 @@ end
 
 Pick the from address the app already uses for SES (it must be a verified
 SES identity). Don't hard-code secrets.
+
+Unsubscribe links in sent emails are signed with the endpoint's
+`secret_key_base`. Rotating it breaks every unsubscribe link already sent,
+and the law expects them to keep working for 30 days (CAN-SPAM) to 60 days
+(CASL). Tell the user this in the final summary.
 
 If you don't know the organisation's postal address, don't invent one: leave
 it `nil`, tell the user, and the campaign page will warn until it's set.

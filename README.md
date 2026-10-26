@@ -146,8 +146,9 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
   each SES delivery, unsubscribes, and SES events for emails that aren't
   campaign deliveries. Warning: retries, bounces, complaints, rejects,
   stopped sends and rejected SNS messages. Error: emails that failed for good.
-* Addresses are masked (`a***@example.com`); the full address is on the
-  report page. The ids are also Logger metadata (plus `customer_contact:
+* Recipient addresses are masked (`a***@example.com`), including inside
+  mailer error messages; the full address is on the report page. The admin
+  who acted is logged in full (`by=`), as an audit trail. The ids are also Logger metadata (plus `customer_contact:
   true`) for apps that log structured metadata.
 * Two lines per recipient at `:info` can be a lot for big lists. To keep only
   problems, add `Logger.put_module_level(CustomerContact.Log, :warning)` to
@@ -159,7 +160,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.5"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.6"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)
@@ -223,7 +224,20 @@ daisyUI), and the AWS SES/SNS setup in the prompt's checklist.
 * Tracking tokens never contain email addresses. Replaying a pixel or link
   increments counters but doesn't add event rows.
 * Unsubscribe `GET` only shows a confirmation; the change happens on `POST`, so
-  link scanners can't unsubscribe people.
+  link scanners can't unsubscribe people. The page shows the address masked,
+  since the email may have been forwarded. The public pages send their own
+  security headers (CSP with no scripts and `frame-ancestors 'none'`,
+  `X-Frame-Options: DENY`, `nosniff`), because they sit outside the host's
+  `:browser` pipeline.
+* Tokens are signed with the host endpoint's `secret_key_base` and don't
+  expire. **Don't rotate `secret_key_base` casually**: it breaks every
+  unsubscribe link already sent, and CAN-SPAM / CASL expect them to work for
+  30 / 60 days.
+* Approval checks the recipient *count*, not who the recipients are: if one
+  person leaves the list and another joins, the count still matches and the
+  campaign sends to the new person.
+* Campaign HTML is capped at 500 KB, and the HTML processing stays fast on
+  malformed input.
 * Recipient addresses that aren't well-formed are skipped.
 * No credentials live in this library. AWS keys, configuration-set names and
   topic ARNs come from the host's runtime environment.
