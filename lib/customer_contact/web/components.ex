@@ -11,6 +11,7 @@ defmodule CustomerContact.Web.Components do
   attr :home, :string, default: "/"
   attr :active, :atom, required: true
   slot :inner_block, required: true
+  slot :help, doc: "A short guide to the page, shown by the help icon in the header."
 
   def shell(assigns) do
     ~H"""
@@ -38,11 +39,60 @@ defmodule CustomerContact.Web.Components do
           Campaigns
         </.link>
         <.link
+          navigate={@base <> "/sent"}
+          class={["btn btn-sm", if(@active == :sent, do: "btn-primary", else: "btn-ghost")]}
+        >
+          Sent
+        </.link>
+        <.link
           navigate={@base <> "/audience"}
           class={["btn btn-sm", if(@active == :audience, do: "btn-primary", else: "btn-ghost")]}
         >
           Audience
         </.link>
+        <div class="grow"></div>
+        <button
+          :if={@help != []}
+          type="button"
+          phx-click={JS.toggle(to: "#cc-help")}
+          class="btn btn-sm btn-ghost btn-square"
+          title="Help"
+          aria-label="Help"
+          aria-controls="cc-help"
+          id="cc-help-toggle"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            class="size-5"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"
+            />
+          </svg>
+        </button>
+      </div>
+      <div :if={@help != []} id="cc-help" class="hidden card bg-base-200 border border-base-300 mb-6">
+        <div class="card-body p-4 text-sm">
+          <div class="flex items-center">
+            <h2 class="font-semibold grow">How this page works</h2>
+            <button
+              type="button"
+              phx-click={JS.hide(to: "#cc-help")}
+              class="btn btn-ghost btn-xs"
+              aria-label="Close help"
+            >
+              ✕
+            </button>
+          </div>
+          {render_slot(@help)}
+        </div>
       </div>
       <div :if={msg = Phoenix.Flash.get(@flash, :info)} role="alert" class="alert alert-success mb-4" id="cc-flash-info">
         {msg}

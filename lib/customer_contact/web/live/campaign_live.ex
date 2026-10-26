@@ -189,6 +189,36 @@ defmodule CustomerContact.Web.CampaignLive do
 
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
+      <:help>
+        <ol class="list-decimal pl-5 space-y-1">
+          <li>
+            <strong>Write it:</strong> the internal name is only for admins. The subject and preheader appear in the inbox.
+            Paste the email HTML. With the <em>Branded</em> layout it's wrapped in the site's header and footer.
+            The preview on the right shows what customers will see.
+          </li>
+          <li>
+            <strong>Personalise it (optional):</strong> <code>{"{{first_name}}"}</code>, <code>{"{{name}}"}</code>
+            and <code>{"{{email}}"}</code>
+            are filled in for each person. Add a fallback for people without one: <code>{"{{first_name|friend}}"}</code>.
+          </li>
+          <li><strong>Choose who it goes to</strong> under "Send to", then <strong>Save</strong>.</li>
+          <li>
+            <strong>Send a test.</strong>
+            It goes only to the test recipients listed
+            on the <.link navigate={@cc_base <> "/audience"} class="link">Audience</.link>
+            page, with "[TEST]" in the subject. Check it in your inbox.
+          </li>
+          <li>
+            <strong>Approve</strong>
+            by typing the recipient count. This is a final check that the audience is the one you meant.
+          </li>
+          <li><strong>Send.</strong> You can cancel from the report while it's still sending.</li>
+        </ol>
+        <p>
+          Editing the email after testing means testing again. Changing who it goes to after approval means approving again.
+          Unsubscribed, bounced and complaining addresses are always left out, and every email has an unsubscribe link.
+        </p>
+      </:help>
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <h2 class="text-lg font-semibold">{@campaign.name || "New campaign"}</h2>
         <.status_badge :if={@campaign.id} status={@campaign.status} />

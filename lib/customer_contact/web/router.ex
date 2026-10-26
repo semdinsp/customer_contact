@@ -39,6 +39,7 @@ defmodule CustomerContact.Web.Router do
           live "/campaigns/new", CustomerContact.Web.CampaignLive, :new
           live "/campaigns/:id", CustomerContact.Web.CampaignLive, :edit
           live "/campaigns/:id/report", CustomerContact.Web.ReportLive, :show
+          live "/sent", CustomerContact.Web.SentLive, :index
           live "/audience", CustomerContact.Web.AudienceLive, :index
         end
       end

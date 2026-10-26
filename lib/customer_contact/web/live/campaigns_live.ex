@@ -20,6 +20,25 @@ defmodule CustomerContact.Web.CampaignsLive do
   def render(assigns) do
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
+      <:help>
+        <p>Every campaign goes through the same steps, and nothing reaches customers until the last one:</p>
+        <ol class="list-decimal pl-5 space-y-1">
+          <li>
+            <strong>Add yourself as a test recipient</strong>
+            on the <.link navigate={@cc_base <> "/audience"} class="link">Audience</.link>
+            page (once only).
+          </li>
+          <li>
+            <strong>New campaign:</strong> give it a name and subject, paste the email HTML, choose who it goes to and Save.
+          </li>
+          <li><strong>Send a test</strong> and check it in your inbox: wording, links, images and the unsubscribe link.</li>
+          <li><strong>Approve</strong> by typing the number of recipients shown.</li>
+          <li>
+            <strong>Send.</strong> The report shows deliveries, opens, clicks, bounces and unsubscribes as they come in.
+          </li>
+        </ol>
+        <p>Changing the email after a test or approval sends it back a step, so customers only ever get what was tested.</p>
+      </:help>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold">Campaigns</h2>
         <.link navigate={@cc_base <> "/campaigns/new"} class="btn btn-primary btn-sm" id="new-campaign">

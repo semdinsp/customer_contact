@@ -374,6 +374,31 @@ defmodule CustomerContact.Campaigns do
     |> repo().all()
   end
 
+  @doc """
+  Emails sent across all campaigns, newest first, with `campaign` preloaded.
+
+  Options: `:email` (case-insensitive, matches part of the address),
+  `:campaign_id`, `:status`, `:test` (default `false`), `:limit` (default 200).
+  """
+  def list_sent(opts \\ []) do
+    test? = Keyword.get(opts, :test, false)
+    email = opts |> Keyword.get(:email, "") |> to_string() |> String.trim()
+
+    from(d in Delivery,
+      join: c in assoc(d, :campaign),
+      where: d.test == ^test?,
+      order_by: [desc: d.inserted_at, asc: d.email],
+      limit: ^Keyword.get(opts, :limit, 200),
+      preload: [campaign: c]
+    )
+    |> then(fn q -> if email != "", do: where(q, [d], ilike(d.email, ^"%#{escape_like(email)}%")), else: q end)
+    |> then(fn q -> if id = opts[:campaign_id], do: where(q, [d], d.campaign_id == ^id), else: q end)
+    |> then(fn q -> if status = opts[:status], do: where(q, [d], d.status == ^status), else: q end)
+    |> repo().all()
+  end
+
+  defp escape_like(text), do: String.replace(text, ~w(\\ % _), &("\\" <> &1))
+
   @doc "True when the host's brand includes the postal address the email footer must show."
   def postal_address?, do: not blank?(CustomerContact.brand()[:postal_address])
 

@@ -63,6 +63,21 @@ defmodule CustomerContact.Web.ReportLive do
   def render(assigns) do
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:campaigns}>
+      <:help>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>
+            While a campaign is sending, the numbers update every few seconds. <em>Cancel sending</em>
+            stops emails that haven't gone yet.
+          </li>
+          <li>
+            <strong>Delivered</strong>
+            means the recipient's mail server accepted it. <strong>Bounced</strong>
+            and <strong>Complaints</strong>
+            addresses are never emailed again.
+          </li>
+          <li>Opens are approximate. Clicks are reliable. Filter the table by status to find problems.</li>
+        </ul>
+      </:help>
       <div class="flex flex-wrap items-center gap-3 mb-2">
         <h2 class="text-lg font-semibold">{@campaign.name}</h2>
         <.status_badge status={@campaign.status} />
