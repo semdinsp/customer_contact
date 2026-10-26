@@ -197,6 +197,27 @@ defmodule CustomerContact.Web.Components do
     """
   end
 
+  def input(%{type: "checkbox"} = assigns) do
+    ~H"""
+    <fieldset class="fieldset">
+      <label class="label cursor-pointer justify-start gap-2">
+        <input type="hidden" name={@field.name} value="false" />
+        <input
+          type="checkbox"
+          id={@field.id}
+          name={@field.name}
+          value="true"
+          checked={Phoenix.HTML.Form.normalize_value("checkbox", @field.value)}
+          class="checkbox checkbox-sm"
+          {@rest}
+        />
+        <span>{@label}</span>
+      </label>
+      <.errors field={@field} />
+    </fieldset>
+    """
+  end
+
   def input(assigns) do
     ~H"""
     <fieldset class="fieldset">

@@ -162,4 +162,42 @@ defmodule CustomerContact.Web.AdminLiveTest do
     {:error, {:live_redirect, _}} = view |> element("#duplicate-#{original.id}") |> render_click()
     assert length(CustomerContact.Campaigns.list_campaigns()) == 3
   end
+
+  test "admins can add a person by hand, who then receives campaigns" do
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+
+    html = view |> form("#contact-form", contact: %{email: "new@example.org", name: "Nina New"}) |> render_submit()
+    assert html =~ "confirm they agreed to receive emails"
+    assert CustomerContact.Audience.list_contacts() == []
+
+    html =
+      view
+      |> form("#contact-form", contact: %{email: "Alice@example.com", consent: "true"})
+      |> render_submit()
+
+    assert html =~ "is already in the audience"
+
+    html =
+      view
+      |> form("#contact-form", contact: %{email: " New@Example.org ", name: "Nina New", consent: "true"})
+      |> render_submit()
+
+    assert html =~ "Added new@example.org."
+
+    assert [%{email: "new@example.org", added_by: "admin@example.test"} = contact] =
+             CustomerContact.Audience.list_contacts()
+
+    assert contact.consent_note =~ "admin@example.test"
+    assert html =~ "Added manually"
+    assert html =~ "added manually"
+
+    emails = &Enum.map(CustomerContact.Audience.deliverable_recipients(&1), fn r -> r.email end)
+    assert "new@example.org" in emails.(["all"])
+    assert emails.(["manual"]) == ["new@example.org"]
+    refute "new@example.org" in emails.(["tag:" <> Ecto.UUID.generate()])
+
+    view |> element("#delete-contact-#{contact.id}") |> render_click()
+    assert CustomerContact.Audience.list_contacts() == []
+    refute "new@example.org" in emails.(["all"])
+  end
 end

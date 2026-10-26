@@ -6,9 +6,10 @@ defmodule CustomerContact.Audience do
 
   import Ecto.Query
 
-  alias CustomerContact.{Recipient, Suppression, Tag, Tagging, TestRecipient}
+  alias CustomerContact.{Contact, Recipient, Suppression, Tag, Tagging, TestRecipient}
 
   @all "all"
+  @manual "manual"
 
   def normalize_email(nil), do: nil
   def normalize_email(email), do: email |> String.trim() |> String.downcase()
@@ -21,9 +22,16 @@ defmodule CustomerContact.Audience do
     Code.ensure_loaded?(host) and function_exported?(host, :list_segments, 0)
   end
 
+  @doc "Everyone who may receive campaigns: the host's recipients plus contacts added by hand."
+  def list_recipients do
+    CustomerContact.host().list_recipients() ++ Enum.map(list_contacts(), &contact_recipient/1)
+  end
+
   @doc "Every segment a campaign can target, with recipient counts."
   def list_segments do
-    everyone = %{id: @all, name: "Everyone", count: length(CustomerContact.host().list_recipients())}
+    contacts = list_contacts()
+    everyone = %{id: @all, name: "Everyone", count: length(CustomerContact.host().list_recipients()) + length(contacts)}
+    manual = %{id: @manual, name: "Added manually", count: length(contacts)}
 
     others =
       if host_segments?() do
@@ -34,20 +42,26 @@ defmodule CustomerContact.Audience do
         end)
       end
 
-    [everyone | others]
+    [everyone | others] ++ if(contacts == [], do: [], else: [manual])
   end
 
   @doc "Raw recipients for the given segment ids (may contain duplicates and suppressed people)."
   def recipients_for_segments([]), do: []
 
   def recipients_for_segments(ids) do
-    host = CustomerContact.host()
-
-    cond do
-      @all in ids -> host.list_recipients()
-      host_segments?() -> host.recipients_for_segments(ids)
-      true -> built_in_tag_recipients(ids)
+    if @all in ids do
+      list_recipients()
+    else
+      {manual, others} = Enum.split_with(ids, &(&1 == @manual))
+      manual = if manual == [], do: [], else: Enum.map(list_contacts(), &contact_recipient/1)
+      segment_recipients(others) ++ manual
     end
+  end
+
+  defp segment_recipients([]), do: []
+
+  defp segment_recipients(ids) do
+    if host_segments?(), do: CustomerContact.host().recipients_for_segments(ids), else: built_in_tag_recipients(ids)
   end
 
   defp built_in_tag_recipients(ids) do
@@ -58,7 +72,7 @@ defmodule CustomerContact.Audience do
       |> repo().all()
       |> MapSet.new()
 
-    Enum.filter(CustomerContact.host().list_recipients(), &MapSet.member?(refs, to_string(&1.ref)))
+    Enum.filter(list_recipients(), &MapSet.member?(refs, to_string(&1.ref)))
   end
 
   @doc """
@@ -122,6 +136,43 @@ defmodule CustomerContact.Audience do
   def delete_test_recipient(id) do
     if valid_uuid?(id), do: repo().delete_all(from t in TestRecipient, where: t.id == ^id), else: {0, nil}
   end
+
+  ## Contacts added by hand
+
+  def list_contacts, do: repo().all(from c in Contact, order_by: [desc: c.inserted_at])
+
+  def change_contact(attrs \\ %{}), do: Contact.changeset(%Contact{}, attrs)
+
+  @doc """
+  Adds a person by hand. Refused if the host already supplies that address.
+  `actor` is recorded with the consent confirmation.
+  """
+  def add_contact(attrs, actor) do
+    changeset = Contact.changeset(%Contact{added_by: actor}, attrs)
+    email = Ecto.Changeset.get_field(changeset, :email)
+
+    if email && Enum.any?(CustomerContact.host().list_recipients(), &(normalize_email(&1.email) == email)) do
+      {:error, %{Ecto.Changeset.add_error(changeset, :email, "is already in the audience") | action: :insert}}
+    else
+      changeset
+      |> Ecto.Changeset.put_change(:consent_note, "Consent confirmed by #{actor}")
+      |> repo().insert()
+    end
+  end
+
+  @doc "Removes a hand-added person and their tags. Doesn't suppress the address."
+  def delete_contact(id) do
+    if valid_uuid?(id) do
+      repo().transaction(fn ->
+        repo().delete_all(from t in Tagging, where: t.recipient_ref == ^("manual:" <> id))
+        repo().delete_all(from c in Contact, where: c.id == ^id)
+      end)
+    else
+      {:error, :invalid}
+    end
+  end
+
+  defp contact_recipient(%Contact{} = c), do: %Recipient{ref: "manual:" <> c.id, email: c.email, name: c.name}
 
   ## Built-in tags
 
