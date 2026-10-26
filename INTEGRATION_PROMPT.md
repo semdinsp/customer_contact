@@ -24,7 +24,7 @@ Follow this repo's CLAUDE.md git workflow: work on a new branch
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.6"},
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.7"},
 ```
 
 Add `:customer_contact` to `import_deps` in `.formatter.exs` so `mix format`
@@ -60,13 +60,13 @@ assertions to match the mode in use.
 ```elixir
 defmodule MyApp.Repo.Migrations.AddCustomerContact do
   use Ecto.Migration
-  def up, do: CustomerContact.Migrations.up(version: 1)
+  def up, do: CustomerContact.Migrations.up(version: 2)
   def down, do: CustomerContact.Migrations.down(version: 1)
 end
 ```
 
 This creates the `cc_*` tables (campaigns, deliveries, events, suppressions,
-test recipients, tags, taggings).
+test recipients, tags, taggings, contacts).
 
 ## 4. Host module
 

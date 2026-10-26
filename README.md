@@ -39,7 +39,8 @@ screen.
 * **Sent** lists every campaign email across all campaigns, newest first,
   with its status, opens and clicks. Search by address to see everything one
   person was sent, or filter by campaign, status or test sends.
-* **Audience** shows the segments with recipient counts, the test recipient
+* **Audience** has an **Add a person** form for people who aren't in the
+  app's own records, and shows the segments with recipient counts, the test recipient
   list, the suppression list (add or remove addresses by hand), and, if the
   app doesn't supply its own tags, a table for creating built-in tags and
   ticking which customers have them. Each row of that table has an
@@ -102,6 +103,12 @@ fields are left as typed.
     for the person). Leave out anyone the app has blocked.
   * Optionally `list_segments/0` and `recipients_for_segments/1`, if the app
     already has its own tags or groups. Otherwise admins use the built-in tags.
+* Admins can also **add a person by hand** on the Audience page (email, name,
+  and a tick-box confirming they agreed to receive emails), for people who
+  aren't in the app's own records. They're stored in `cc_contacts`, included
+  in **Everyone** and in an **Added manually** segment, and can be given
+  built-in tags. An address the app already supplies can't be added twice.
+  `Audience.list_recipients/0` returns the host's recipients plus these.
 * **Everyone** (`"all"`) is always a segment. A campaign can target several
   segments; recipients in more than one get one email.
 * Addresses are trimmed, lower-cased and de-duplicated, and malformed ones are
@@ -161,7 +168,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.6"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.7"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)

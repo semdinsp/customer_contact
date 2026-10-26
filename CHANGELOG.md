@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.1.7
+
+**Needs a migration.** Add a host migration calling
+`CustomerContact.Migrations.up(version: 2)` (down: `down(version: 2)`).
+
+* **Add a person by hand.** The Audience page has an **Add a person** form:
+  email, name, and a required tick-box confirming they agreed to receive
+  emails (recorded with the admin who ticked it). Hand-added people are
+  included in Everyone and in a new **Added manually** segment, can be given
+  built-in tags, and have a Remove button. An address the app already supplies
+  is refused as a duplicate. Additions and removals are logged.
+* **Migrations upgrade in place.** `up(version: n)` now skips versions that
+  are already applied, so an app on version 1 can add a migration calling
+  `up(version: 2)`. Version 2 adds the `cc_contacts` table.
+
 ## v0.1.6
 
 * **Duplicate a campaign.** A Duplicate button (copy icon) on the campaign
