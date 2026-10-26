@@ -18,8 +18,9 @@ in [`CHANGELOG.md`](CHANGELOG.md).
 ## What admins see
 
 The pages live wherever the app mounts them (usually `/admin/contact`). The
-header has a home icon back to the app's admin dashboard, and tabs for
-Campaigns and Audience. Messages (saved, test sent, why something was
+header has a home icon back to the app's admin dashboard, tabs for Campaigns
+and Audience, and a help icon (?) that opens a short guide to the current page.
+Messages (saved, test sent, why something was
 refused) appear at the top of the page and pinned to the bottom corner of the
 screen.
 
@@ -37,7 +38,8 @@ screen.
 * **Audience** shows the segments with recipient counts, the test recipient
   list, the suppression list (add or remove addresses by hand), and, if the
   app doesn't supply its own tags, a table for creating built-in tags and
-  ticking which customers have them.
+  ticking which customers have them. Each row of that table has an
+  **Unsubscribe** button that adds the person to the suppression list.
 
 ## How a campaign works
 
@@ -154,7 +156,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.4"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.5"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)

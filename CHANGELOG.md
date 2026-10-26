@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.5
+
+* **Help on every page.** A help icon (?) at the right of the header opens a
+  short guide to the page: how to write, test, approve and send a campaign,
+  what the audience sections do, and how to read a report.
+* **One-click unsubscribe.** The people table on the Audience page has an
+  Unsubscribe button beside each person. It adds them to the suppression
+  list (reason `manual`, noting which admin did it) after a confirmation.
+  People already suppressed show an "unsubscribed" badge instead. The table
+  only appears when the app uses CustomerContact's built-in tags. Otherwise,
+  add the address to the suppression list.
+
 ## v0.1.4
 
 * **Messages you can't miss.** Admin messages (e.g. "Add a subject first.")

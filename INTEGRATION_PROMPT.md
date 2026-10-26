@@ -24,7 +24,7 @@ Follow this repo's CLAUDE.md git workflow: work on a new branch
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.4"},
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.5"},
 ```
 
 Add `:customer_contact` to `import_deps` in `.formatter.exs` so `mix format`
