@@ -4,7 +4,7 @@ defmodule CustomerContact.Web.AudienceLive do
 
   import CustomerContact.Web.Components
 
-  alias CustomerContact.Audience
+  alias CustomerContact.{Audience, Log}
 
   @shown 200
 
@@ -19,11 +19,14 @@ defmodule CustomerContact.Web.AudienceLive do
   end
 
   defp load(socket) do
+    suppressions = Audience.list_suppressions()
+
     socket =
       assign(socket,
         segments: Audience.list_segments(),
         test_recipients: Audience.list_test_recipients(),
-        suppressions: Audience.list_suppressions()
+        suppressions: suppressions,
+        suppressed: MapSet.new(suppressions, & &1.email)
       )
 
     if socket.assigns.host_segments do
@@ -58,6 +61,16 @@ defmodule CustomerContact.Web.AudienceLive do
     case Audience.suppress(email, "manual", "Added by #{socket.assigns.cc_actor}") do
       {:ok, _} -> {:noreply, socket |> put_flash(:info, "Suppressed #{email}.") |> load()}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Enter a valid email.")}
+    end
+  end
+
+  def handle_event("unsubscribe", %{"ref" => ref}, socket) do
+    with %{email: email} when is_binary(email) <- Enum.find(socket.assigns.recipients, &(to_string(&1.ref) == ref)),
+         {:ok, _} <- Audience.suppress(email, "manual", "Unsubscribed by #{socket.assigns.cc_actor}") do
+      Log.info("unsubscribed by admin", to: Log.mask_email(email), by: socket.assigns.cc_actor)
+      {:noreply, socket |> put_flash(:info, "Unsubscribed #{email}. Campaigns won't email them.") |> load()}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Couldn't unsubscribe that person.")}
     end
   end
 
@@ -201,7 +214,7 @@ defmodule CustomerContact.Web.AudienceLive do
               <table class="table table-xs" id="tag-people">
                 <thead>
                   <tr>
-                    <th>Name</th><th>Email</th><th :for={t <- @tags}>{t.name}</th>
+                    <th>Name</th><th>Email</th><th :for={t <- @tags}>{t.name}</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -217,6 +230,24 @@ defmodule CustomerContact.Web.AudienceLive do
                         phx-value-tag={t.id}
                         phx-value-ref={r.ref}
                       />
+                    </td>
+                    <td class="text-right">
+                      <span
+                        :if={r.email && MapSet.member?(@suppressed, Audience.normalize_email(r.email))}
+                        class="badge badge-ghost badge-sm"
+                      >
+                        unsubscribed
+                      </span>
+                      <button
+                        :if={r.email && !MapSet.member?(@suppressed, Audience.normalize_email(r.email))}
+                        phx-click="unsubscribe"
+                        phx-value-ref={r.ref}
+                        data-confirm={"Unsubscribe #{r.email}? Campaigns will stop emailing them."}
+                        class="btn btn-ghost btn-xs"
+                        id={"unsubscribe-#{r.ref}"}
+                      >
+                        Unsubscribe
+                      </button>
                     </td>
                   </tr>
                 </tbody>

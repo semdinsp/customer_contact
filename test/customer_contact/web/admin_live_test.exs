@@ -78,4 +78,13 @@ defmodule CustomerContact.Web.AdminLiveTest do
     view |> form("#tag-form", tag: %{name: "Donors"}) |> render_submit()
     assert render(view) =~ "Donors"
   end
+
+  test "audience page unsubscribes a person in one click" do
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+    assert view |> element("#unsubscribe-2") |> render_click() =~ "Unsubscribed bob@example.com"
+    refute has_element?(view, "#unsubscribe-2")
+    assert has_element?(view, "#unsubscribe-1")
+    assert CustomerContact.Audience.suppressed?("bob@example.com")
+    assert [%{email: "alice@example.com"}] = CustomerContact.Audience.deliverable_recipients(["all"])
+  end
 end
