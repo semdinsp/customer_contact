@@ -83,7 +83,7 @@ defmodule CustomerContact.Web.AdminLiveTest do
     test_recipient_fixture()
     campaign = campaign_fixture()
 
-    for path <- ["", "/audience", "/campaigns/new", "/campaigns/#{campaign.id}"] do
+    for path <- ["", "/sent", "/audience", "/campaigns/new", "/campaigns/#{campaign.id}"] do
       {:ok, view, _} = live(admin_conn(), "/admin/contact" <> path)
       assert has_element?(view, "#cc-help-toggle[aria-controls=cc-help]"), path
       assert has_element?(view, "#cc-help.hidden", "How this page works"), path
@@ -97,5 +97,30 @@ defmodule CustomerContact.Web.AdminLiveTest do
     assert has_element?(view, "#unsubscribe-1")
     assert CustomerContact.Audience.suppressed?("bob@example.com")
     assert [%{email: "alice@example.com"}] = CustomerContact.Audience.deliverable_recipients(["all"])
+  end
+
+  test "sent page lists emails across campaigns and filters by address" do
+    test_recipient_fixture()
+    {:ok, campaign, _} = CustomerContact.Campaigns.send_test(campaign_fixture(), "a")
+    {:ok, campaign} = CustomerContact.Campaigns.approve(campaign, "a", "2")
+    {:ok, campaign} = CustomerContact.Campaigns.start_send(campaign, "a")
+    :ok = perform_job(CustomerContact.Workers.Dispatch, %{campaign_id: campaign.id})
+
+    {:ok, view, html} = live(admin_conn(), "/admin/contact/sent")
+    assert html =~ "alice@example.com"
+    assert html =~ "bob@example.com"
+    refute html =~ "tester@example.test"
+
+    html = view |> form("#sent-filters", email: "BOB") |> render_change()
+    assert_patch(view, "/admin/contact/sent?email=BOB")
+    assert html =~ "bob@example.com"
+    refute html =~ "alice@example.com"
+
+    {:ok, _view, html} = live(admin_conn(), "/admin/contact/sent?test=true&campaign=#{campaign.id}")
+    assert html =~ "tester@example.test"
+    refute html =~ "alice@example.com"
+
+    {:ok, _view, html} = live(admin_conn(), "/admin/contact/sent?email=%25&status=nonsense&campaign=nope")
+    assert html =~ "No emails match."
   end
 end

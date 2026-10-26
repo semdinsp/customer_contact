@@ -39,6 +39,12 @@ defmodule CustomerContact.Web.Components do
           Campaigns
         </.link>
         <.link
+          navigate={@base <> "/sent"}
+          class={["btn btn-sm", if(@active == :sent, do: "btn-primary", else: "btn-ghost")]}
+        >
+          Sent
+        </.link>
+        <.link
           navigate={@base <> "/audience"}
           class={["btn btn-sm", if(@active == :audience, do: "btn-primary", else: "btn-ghost")]}
         >
