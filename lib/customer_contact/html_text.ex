@@ -23,13 +23,17 @@ defmodule CustomerContact.HTMLText do
     "rarr" => "→"
   }
 
+  @anchor ~r/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>((?:(?!<a\b).)*?)<\/a\s*>/is
+
   def convert(nil), do: ""
 
   def convert(html) do
     html
-    |> String.replace(~r/<!--.*?-->/s, "")
-    |> String.replace(~r/<(head|style|script|title)\b[^>]*>.*?<\/\1\s*>/is, "")
-    |> String.replace(~r/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>(.*?)<\/a\s*>/is, &link/1)
+    # Each lazy match stops at the next opening tag of its kind, so unclosed
+    # comments, blocks or links can't make these quadratic.
+    |> String.replace(~r/<!--(?:(?!<!--).)*?-->/s, "")
+    |> String.replace(~r/<(head|style|script|title)\b[^>]*>(?:(?!<\1\b).)*?<\/\1\s*>/is, "")
+    |> String.replace(@anchor, &link/1)
     |> String.replace(~r/<br\s*\/?>/i, "\n")
     |> String.replace(~r/<li\b[^>]*>/i, "\n- ")
     |> String.replace(~r/<\/(p|div|h[1-6]|tr|table|ul|ol|blockquote)\s*>/i, "\n\n")
@@ -42,7 +46,7 @@ defmodule CustomerContact.HTMLText do
   end
 
   defp link(match) do
-    [_, href, text] = Regex.run(~r/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>(.*?)<\/a\s*>/is, match)
+    [_, href, text] = Regex.run(@anchor, match)
     text = text |> String.replace(~r/<[^>]+>/, "") |> String.trim()
     href = decode_entities(href)
 
