@@ -76,10 +76,18 @@ defmodule CustomerContact.TestEndpoint do
   plug CustomerContact.TestRouter
 end
 
+# Two migrations, as in a host app that installed version 1 and later
+# upgraded: the second must skip the version 1 tables that already exist.
 defmodule CustomerContact.TestMigration do
   use Ecto.Migration
-  def up, do: CustomerContact.Migrations.up()
-  def down, do: CustomerContact.Migrations.down()
+  def up, do: CustomerContact.Migrations.up(version: 1)
+  def down, do: CustomerContact.Migrations.down(version: 1)
+end
+
+defmodule CustomerContact.TestMigrationV2 do
+  use Ecto.Migration
+  def up, do: CustomerContact.Migrations.up(version: 2)
+  def down, do: CustomerContact.Migrations.down(version: 2)
 end
 
 defmodule CustomerContact.TestObanMigration do

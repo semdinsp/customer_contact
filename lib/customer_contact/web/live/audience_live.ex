@@ -15,6 +15,7 @@ defmodule CustomerContact.Web.AudienceLive do
      |> assign(page_title: "Audience", search: "", host_segments: Audience.host_segments?())
      |> assign(test_form: to_form(Audience.change_test_recipient(), as: :test_recipient))
      |> assign(tag_form: to_form(Audience.change_tag(), as: :tag))
+     |> assign(contact_form: to_form(Audience.change_contact(), as: :contact))
      |> load()}
   end
 
@@ -25,6 +26,7 @@ defmodule CustomerContact.Web.AudienceLive do
       assign(socket,
         segments: Audience.list_segments(),
         test_recipients: Audience.list_test_recipients(),
+        contacts: Audience.list_contacts(),
         suppressions: suppressions,
         suppressed: MapSet.new(suppressions, & &1.email)
       )
@@ -35,7 +37,7 @@ defmodule CustomerContact.Web.AudienceLive do
       assign(socket,
         tags: Audience.list_tags(),
         taggings: Audience.taggings_by_ref(),
-        recipients: CustomerContact.host().list_recipients()
+        recipients: Audience.list_recipients()
       )
     end
   end
@@ -49,6 +51,39 @@ defmodule CustomerContact.Web.AudienceLive do
 
       {:error, changeset} ->
         {:noreply, assign(socket, test_form: to_form(changeset, as: :test_recipient))}
+    end
+  end
+
+  def handle_event("add_contact", %{"contact" => params}, socket) do
+    case Audience.add_contact(params, socket.assigns.cc_actor) do
+      {:ok, contact} ->
+        Log.info("contact added by admin", to: Log.mask_email(contact.email), by: socket.assigns.cc_actor)
+
+        note =
+          if MapSet.member?(socket.assigns.suppressed, contact.email),
+            do: " They're on the suppression list, so campaigns will skip them until they're removed from it.",
+            else: ""
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Added #{contact.email}." <> note)
+         |> assign(contact_form: to_form(Audience.change_contact(), as: :contact))
+         |> load()}
+
+      {:error, changeset} ->
+        {:noreply, assign(socket, contact_form: to_form(changeset, as: :contact))}
+    end
+  end
+
+  def handle_event("delete_contact", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.contacts, &(&1.id == id)) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "That person was already removed.")}
+
+      contact ->
+        {:ok, _} = Audience.delete_contact(contact.id)
+        Log.info("contact removed by admin", to: Log.mask_email(contact.email), by: socket.assigns.cc_actor)
+        {:noreply, socket |> put_flash(:info, "Removed #{contact.email} from the audience.") |> load()}
     end
   end
 
@@ -126,6 +161,14 @@ defmodule CustomerContact.Web.AudienceLive do
             get every test send. Add yourself and anyone who should check an email before it goes out.
             They don't get the real send unless they are also customers.
           </li>
+          <li>
+            <strong>Add a person</strong>
+            for someone who isn't in this app's own records. Tick the box only if they agreed to receive your emails.
+            They join <em>Everyone</em>
+            and the <em>Added manually</em>
+            segment. <em>Remove</em>
+            takes them out again.
+          </li>
           <li :if={!@host_segments}>
             <strong>Tags</strong>
             make your own groups: create a tag, then tick people in the table. The tag then appears as a segment.
@@ -166,6 +209,50 @@ defmodule CustomerContact.Web.AudienceLive do
               <div class="grow"><.input field={@test_form[:name]} label="Name" /></div>
               <button class="btn btn-sm btn-secondary mb-2"><.icon name="plus" /> Add</button>
             </.form>
+          </div>
+        </section>
+
+        <section class="card bg-base-200 lg:col-span-2" id="contacts">
+          <div class="card-body p-4">
+            <h2 class="font-semibold">Add a person</h2>
+            <p class="text-xs opacity-70">
+              For people who aren't in this app's own records, e.g. someone who signed up at an event.
+              They're included in <em>Everyone</em> and in the <em>Added manually</em> segment.
+              Only add people who have agreed to receive your emails.
+            </p>
+            <.form for={@contact_form} phx-submit="add_contact" class="flex flex-wrap items-end gap-2" id="contact-form">
+              <div class="grow"><.input field={@contact_form[:email]} label="Email" type="email" /></div>
+              <div class="grow"><.input field={@contact_form[:name]} label="Name" /></div>
+              <div class="w-full">
+                <.input field={@contact_form[:consent]} type="checkbox" label="They agreed to receive our emails" />
+              </div>
+              <button class="btn btn-sm btn-secondary mb-2" id="add-contact"><.icon name="plus" /> Add person</button>
+            </.form>
+            <div :if={@contacts != []} class="overflow-x-auto max-h-80">
+              <table class="table table-xs" id="contact-list">
+                <tbody>
+                  <tr :for={c <- @contacts} id={"contact-#{c.id}"}>
+                    <td>{c.email}</td>
+                    <td>{c.name}</td>
+                    <td class="text-xs opacity-70">added by {c.added_by} · {format_time(c.inserted_at)}</td>
+                    <td>
+                      <span :if={MapSet.member?(@suppressed, c.email)} class="badge badge-ghost badge-sm">unsubscribed</span>
+                    </td>
+                    <td class="text-right">
+                      <button
+                        phx-click="delete_contact"
+                        phx-value-id={c.id}
+                        data-confirm={"Remove #{c.email} from the audience?"}
+                        class="btn btn-ghost btn-xs text-error"
+                        id={"delete-contact-#{c.id}"}
+                      >
+                        <.icon name="trash" /> Remove
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -248,7 +335,12 @@ defmodule CustomerContact.Web.AudienceLive do
                 <tbody>
                   <tr :for={r <- filtered(@recipients, @search)}>
                     <td>{r.name}</td>
-                    <td>{r.email}</td>
+                    <td>
+                      {r.email}
+                      <span :if={String.starts_with?(to_string(r.ref), "manual:")} class="badge badge-ghost badge-xs">
+                        added manually
+                      </span>
+                    </td>
                     <td :for={t <- @tags}>
                       <input
                         type="checkbox"

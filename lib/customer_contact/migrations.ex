@@ -9,22 +9,47 @@ defmodule CustomerContact.Migrations do
         def down, do: CustomerContact.Migrations.down(version: 1)
       end
 
-  Later library versions add `version: 2` and so on; add a new host migration
-  that calls `up(version: 2)` when upgrading.
+  Later library versions add `version: 2` and so on. To upgrade, add a new
+  host migration:
+
+      defmodule MyApp.Repo.Migrations.UpgradeCustomerContactV2 do
+        use Ecto.Migration
+
+        def up, do: CustomerContact.Migrations.up(version: 2)
+        def down, do: CustomerContact.Migrations.down(version: 2)
+      end
+
+  `up(version: n)` applies every version up to `n` that isn't applied yet, so
+  it is safe whether the app is on version 1 or new. `down(version: n)` reverts
+  version `n` and anything after it.
+
+  Versions:
+
+    1. campaigns, deliveries, events, suppressions, test recipients, tags
+    2. contacts (people added by hand on the Audience page)
   """
 
   use Ecto.Migration
 
-  @latest 1
+  @latest 2
 
   def latest_version, do: @latest
 
   def up(opts \\ []) do
-    for v <- 1..Keyword.get(opts, :version, @latest), do: change(v, :up)
+    target = Keyword.get(opts, :version, @latest)
+    for v <- 1..target, not applied?(v), do: change(v, :up)
   end
 
   def down(opts \\ []) do
-    for v <- Keyword.get(opts, :version, @latest)..1//-1, do: change(v, :down)
+    from = Keyword.get(opts, :version, 1)
+    for v <- @latest..from//-1, applied?(v), do: change(v, :down)
+  end
+
+  # Each version is recognised by the table it creates.
+  defp applied?(version) do
+    table = Map.fetch!(%{1 => "cc_campaigns", 2 => "cc_contacts"}, version)
+    %{rows: [[exists?]]} = repo().query!("SELECT to_regclass($1) IS NOT NULL", [table], log: false)
+    exists?
   end
 
   defp change(1, :up) do
@@ -133,6 +158,23 @@ defmodule CustomerContact.Migrations do
     end
 
     create unique_index(:cc_taggings, [:tag_id, :recipient_ref])
+  end
+
+  defp change(2, :up) do
+    create table(:cc_contacts, primary_key: false) do
+      add :id, :binary_id, primary_key: true
+      add :email, :string, null: false
+      add :name, :string
+      add :added_by, :string
+      add :consent_note, :string
+      timestamps(type: :utc_datetime)
+    end
+
+    create unique_index(:cc_contacts, [:email])
+  end
+
+  defp change(2, :down) do
+    drop table(:cc_contacts)
   end
 
   defp change(1, :down) do
