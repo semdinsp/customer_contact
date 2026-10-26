@@ -155,13 +155,15 @@ defmodule CustomerContact.Web.AudienceLive do
             <ul class="text-sm">
               <li :for={t <- @test_recipients} class="flex items-center gap-2">
                 <span>{t.email}</span><span class="opacity-60">{t.name}</span>
-                <button phx-click="delete_test" phx-value-id={t.id} class="btn btn-ghost btn-xs text-error">remove</button>
+                <button phx-click="delete_test" phx-value-id={t.id} class="btn btn-ghost btn-xs text-error">
+                  <.icon name="trash" /> Remove
+                </button>
               </li>
             </ul>
             <.form for={@test_form} phx-submit="add_test" class="flex flex-wrap items-end gap-2" id="test-recipient-form">
               <div class="grow"><.input field={@test_form[:email]} label="Email" type="email" /></div>
               <div class="grow"><.input field={@test_form[:name]} label="Name" /></div>
-              <button class="btn btn-sm btn-secondary mb-2">Add</button>
+              <button class="btn btn-sm btn-secondary mb-2"><.icon name="plus" /> Add</button>
             </.form>
           </div>
         </section>
@@ -175,7 +177,7 @@ defmodule CustomerContact.Web.AudienceLive do
             </p>
             <form phx-submit="suppress" class="flex gap-2">
               <input type="email" name="email" placeholder="email@example.com" class="input input-sm" required />
-              <button class="btn btn-sm btn-secondary">Suppress</button>
+              <button class="btn btn-sm btn-secondary"><.icon name="block" /> Suppress</button>
             </form>
             <div class="overflow-x-auto max-h-80">
               <table class="table table-xs">
@@ -192,7 +194,7 @@ defmodule CustomerContact.Web.AudienceLive do
                         data-confirm={"Allow campaigns to email #{s.email} again?"}
                         class="btn btn-ghost btn-xs"
                       >
-                        remove
+                        <.icon name="resubscribe" /> Remove
                       </button>
                     </td>
                   </tr>
@@ -208,7 +210,7 @@ defmodule CustomerContact.Web.AudienceLive do
             <.form for={@tag_form} phx-submit="create_tag" class="flex flex-wrap items-end gap-2" id="tag-form">
               <div><.input field={@tag_form[:name]} label="New tag" /></div>
               <div class="grow"><.input field={@tag_form[:description]} label="Description" /></div>
-              <button class="btn btn-sm btn-secondary mb-2">Create</button>
+              <button class="btn btn-sm btn-secondary mb-2"><.icon name="tag" /> Create</button>
             </.form>
             <div class="flex flex-wrap gap-2">
               <span :for={t <- @tags} class="badge badge-outline gap-1">
@@ -218,8 +220,9 @@ defmodule CustomerContact.Web.AudienceLive do
                   phx-value-id={t.id}
                   data-confirm={"Delete tag #{t.name}? People keep their other tags."}
                   aria-label={"Delete #{t.name}"}
+                  class="hover:text-error"
                 >
-                  ×
+                  <.icon name="close" class="size-3" />
                 </button>
               </span>
             </div>
@@ -267,10 +270,10 @@ defmodule CustomerContact.Web.AudienceLive do
                         phx-click="unsubscribe"
                         phx-value-ref={r.ref}
                         data-confirm={"Unsubscribe #{r.email}? Campaigns will stop emailing them."}
-                        class="btn btn-ghost btn-xs"
+                        class="btn btn-ghost btn-xs text-error"
                         id={"unsubscribe-#{r.ref}"}
                       >
-                        Unsubscribe
+                        <.icon name="unsubscribe" /> Unsubscribe
                       </button>
                     </td>
                   </tr>

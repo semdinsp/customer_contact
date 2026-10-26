@@ -42,7 +42,7 @@ defmodule CustomerContact.Web.CampaignsLive do
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold">Campaigns</h2>
         <.link navigate={@cc_base <> "/campaigns/new"} class="btn btn-primary btn-sm" id="new-campaign">
-          New campaign
+          <.icon name="plus" /> New campaign
         </.link>
       </div>
 
@@ -74,7 +74,7 @@ defmodule CustomerContact.Web.CampaignsLive do
               <td class="text-right">{stats && percent(stats.clicked, stats.sent)}</td>
               <td class="text-right">
                 <.link :if={stats} navigate={@cc_base <> "/campaigns/" <> c.id <> "/report"} class="btn btn-ghost btn-xs">
-                  Report
+                  <.icon name="report" /> Report
                 </.link>
               </td>
             </tr>

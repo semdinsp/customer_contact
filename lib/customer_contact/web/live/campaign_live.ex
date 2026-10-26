@@ -229,7 +229,7 @@ defmodule CustomerContact.Web.CampaignLive do
           navigate={@cc_base <> "/campaigns/" <> @campaign.id <> "/report"}
           class="btn btn-sm btn-outline"
         >
-          View report
+          <.icon name="report" /> View report
         </.link>
       </div>
       <div :if={not @postal_address?} role="alert" class="alert alert-warning mb-4" id="missing-postal-address">
@@ -280,7 +280,7 @@ defmodule CustomerContact.Web.CampaignLive do
               </fieldset>
 
               <div class="flex gap-2 pt-2">
-                <button type="submit" class="btn btn-primary" id="save-campaign">Save</button>
+                <button type="submit" class="btn btn-primary" id="save-campaign"><.icon name="save" /> Save</button>
                 <button
                   :if={@campaign.status == "draft"}
                   type="button"
@@ -288,7 +288,7 @@ defmodule CustomerContact.Web.CampaignLive do
                   data-confirm="Delete this draft?"
                   class="btn btn-ghost text-error"
                 >
-                  Delete draft
+                  <.icon name="trash" /> Delete draft
                 </button>
               </div>
             </fieldset>
@@ -316,7 +316,7 @@ defmodule CustomerContact.Web.CampaignLive do
                     id="send-test"
                     disabled={@test_recipients == []}
                   >
-                    Send test
+                    <.icon name="test" /> Send test
                   </button>
                 </div>
               </div>
@@ -329,7 +329,11 @@ defmodule CustomerContact.Web.CampaignLive do
                   <p class="text-sm text-success" id="approved-status">
                     Approved by {@campaign.approved_by} at {format_time(@campaign.approved_at)} for {@campaign.approved_count} recipients.
                   </p>
-                  <div><button phx-click="revoke" class="btn btn-sm btn-ghost">Revoke approval</button></div>
+                  <div>
+                    <button phx-click="revoke" class="btn btn-sm btn-ghost">
+                      <.icon name="undo" /> Revoke approval
+                    </button>
+                  </div>
                 <% else %>
                   <p class="text-sm">
                     This will go to <strong id="deliverable-count">{@deliverable_count}</strong>
@@ -345,7 +349,9 @@ defmodule CustomerContact.Web.CampaignLive do
                       class="input input-sm w-32"
                       placeholder="count"
                     />
-                    <button type="submit" class="btn btn-sm btn-secondary" disabled={!@tested}>Approve</button>
+                    <button type="submit" class="btn btn-sm btn-secondary" disabled={!@tested}>
+                      <.icon name="approve" /> Approve
+                    </button>
                   </form>
                   <p :if={!@tested} class="text-xs opacity-70">Send a test of the current content first.</p>
                 <% end %>
@@ -362,7 +368,7 @@ defmodule CustomerContact.Web.CampaignLive do
                   disabled={!@approved or @dirty}
                   data-confirm={"Send this email to #{@campaign.approved_count} recipients now? This cannot be undone."}
                 >
-                  Send to {@campaign.approved_count || 0} recipients
+                  <.icon name="send" /> Send to {@campaign.approved_count || 0} recipients
                 </button>
               </div>
             </div>

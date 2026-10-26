@@ -94,7 +94,7 @@ defmodule CustomerContact.Web.AdminLiveTest do
     {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
     assert view |> element("#unsubscribe-2") |> render_click() =~ "Unsubscribed bob@example.com"
     refute has_element?(view, "#unsubscribe-2")
-    assert has_element?(view, "#unsubscribe-1")
+    assert has_element?(view, "#unsubscribe-1 svg")
     assert CustomerContact.Audience.suppressed?("bob@example.com")
     assert [%{email: "alice@example.com"}] = CustomerContact.Audience.deliverable_recipients(["all"])
   end

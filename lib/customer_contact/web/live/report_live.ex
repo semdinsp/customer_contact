@@ -82,7 +82,7 @@ defmodule CustomerContact.Web.ReportLive do
         <h2 class="text-lg font-semibold">{@campaign.name}</h2>
         <.status_badge status={@campaign.status} />
         <div class="grow"></div>
-        <button phx-click="refresh" class="btn btn-sm btn-ghost">Refresh</button>
+        <button phx-click="refresh" class="btn btn-sm btn-ghost"><.icon name="refresh" /> Refresh</button>
         <button
           :if={@campaign.status == "sending"}
           phx-click="cancel"
@@ -90,9 +90,11 @@ defmodule CustomerContact.Web.ReportLive do
           class="btn btn-sm btn-error"
           id="cancel-send"
         >
-          Cancel sending
+          <.icon name="block" /> Cancel sending
         </button>
-        <.link navigate={@cc_base <> "/campaigns/" <> @campaign.id} class="btn btn-sm btn-outline">Campaign</.link>
+        <.link navigate={@cc_base <> "/campaigns/" <> @campaign.id} class="btn btn-sm btn-outline">
+          <.icon name="edit" /> Campaign
+        </.link>
       </div>
       <div :if={@campaign.note} role="alert" class="alert alert-warning mb-4" id="campaign-note">{@campaign.note}</div>
       <p class="text-sm opacity-70 mb-4">
@@ -145,7 +147,9 @@ defmodule CustomerContact.Web.ReportLive do
           </tbody>
         </table>
       </div>
-      <button :if={length(@deliveries) >= @limit} phx-click="more" class="btn btn-sm btn-ghost mt-2">Show more</button>
+      <button :if={length(@deliveries) >= @limit} phx-click="more" class="btn btn-sm btn-ghost mt-2">
+        <.icon name="more" /> Show more
+      </button>
 
       <h3 class="font-semibold mt-8 mb-2">Test sends</h3>
       <p :if={@tests == []} class="text-sm opacity-60">None.</p>
