@@ -52,11 +52,21 @@ defmodule CustomerContact.Web.PublicPlugTest do
     url = path(Tracking.unsubscribe_url(d.id))
     refute url =~ Base.url_encode64("jo@example.com", padding: false)
     conn = get(build_conn(), url)
-    assert html_response(conn, 200) =~ "Unsubscribe <strong>jo@example.com</strong>"
+    html = html_response(conn, 200)
+    # Masked: the email may have been forwarded to someone else.
+    assert html =~ "Unsubscribe <strong>j***@example.com</strong>"
+    refute html =~ "jo@example.com"
+    assert get_resp_header(conn, "x-frame-options") == ["DENY"]
+    assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+    assert [csp] = get_resp_header(conn, "content-security-policy")
+    assert csp =~ "frame-ancestors 'none'"
+    assert csp =~ "form-action 'self'"
     refute Audience.suppressed?("jo@example.com")
 
     conn = post(build_conn(), url, %{"List-Unsubscribe" => "One-Click"})
-    assert html_response(conn, 200) =~ "will no longer receive"
+    html = html_response(conn, 200)
+    assert html =~ "j***@example.com will no longer receive"
+    refute html =~ "jo@example.com"
     assert Audience.suppressed?("jo@example.com")
     assert %{unsubscribed_at: %DateTime{}} = Repo.get!(Delivery, d.id)
   end

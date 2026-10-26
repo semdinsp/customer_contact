@@ -55,7 +55,7 @@ defmodule CustomerContact.Web.PublicPlug do
       {:ok, %{email: email}} ->
         # GET only shows a confirmation: link scanners must not unsubscribe people.
         body = """
-        <p>Unsubscribe <strong>#{esc(email)}</strong> from #{esc(brand_name())} emails?</p>
+        <p>Unsubscribe <strong>#{esc(Log.mask_email(email))}</strong> from #{esc(brand_name())} emails?</p>
         <form method="post" action="">
           <button type="submit" style="padding:10px 20px;font-size:16px;cursor:pointer;">Unsubscribe</button>
         </form>
@@ -74,7 +74,7 @@ defmodule CustomerContact.Web.PublicPlug do
         case Tracking.record_unsubscribe(delivery) do
           :ok ->
             Log.info("unsubscribed", Sender.log_meta(delivery))
-            page(conn, 200, "Unsubscribed", "#{delivery.email} will no longer receive these emails.")
+            page(conn, 200, "Unsubscribed", "#{Log.mask_email(delivery.email)} will no longer receive these emails.")
 
           :error ->
             Log.error("could not unsubscribe", Sender.log_meta(delivery))
@@ -152,7 +152,7 @@ defmodule CustomerContact.Web.PublicPlug do
   defp safely(fun) do
     fun.()
   rescue
-    e -> Log.error("tracking error: " <> Exception.message(e))
+    e -> Log.error("tracking error: " <> Log.mask_emails(Exception.message(e)))
   end
 
   defp brand_name do
@@ -160,6 +160,10 @@ defmodule CustomerContact.Web.PublicPlug do
   rescue
     _ -> ""
   end
+
+  # These pages are served outside the host's :browser pipeline, so they set
+  # their own headers: no scripts, no framing, forms post only back to us.
+  @page_csp "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 
   defp page(conn, status, title, body, opts \\ []) do
     body = if opts[:raw], do: body, else: "<p>#{esc(body)}</p>"
@@ -178,6 +182,9 @@ defmodule CustomerContact.Web.PublicPlug do
     |> put_resp_content_type("text/html")
     |> put_resp_header("cache-control", "no-store")
     |> put_resp_header("referrer-policy", "no-referrer")
+    |> put_resp_header("x-content-type-options", "nosniff")
+    |> put_resp_header("x-frame-options", "DENY")
+    |> put_resp_header("content-security-policy", @page_csp)
     |> send_resp(status, html)
   end
 
