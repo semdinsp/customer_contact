@@ -2,6 +2,12 @@
 
 ## v0.1.5
 
+* **Sent page.** A new **Sent** tab lists every campaign email, newest
+  first: date, recipient, campaign (linked to the email and its report),
+  status, opens and clicks. Search by full or partial address to see
+  everything one person was sent, and filter by campaign, status, or test
+  sends. Filters are kept in the URL (`/sent?email=…`), so a search can be
+  bookmarked.
 * **Help on every page.** A help icon (?) at the right of the header opens a
   short guide to the page: how to write, test, approve and send a campaign,
   what the audience sections do, and how to read a report.

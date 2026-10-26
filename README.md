@@ -18,8 +18,8 @@ in [`CHANGELOG.md`](CHANGELOG.md).
 ## What admins see
 
 The pages live wherever the app mounts them (usually `/admin/contact`). The
-header has a home icon back to the app's admin dashboard, tabs for Campaigns
-and Audience, and a help icon (?) that opens a short guide to the current page.
+header has a home icon back to the app's admin dashboard, tabs for Campaigns,
+Sent and Audience, and a help icon (?) that opens a short guide to the current page.
 Messages (saved, test sent, why something was
 refused) appear at the top of the page and pinned to the bottom corner of the
 screen.
@@ -35,6 +35,9 @@ screen.
   bounce or error. It
   refreshes every few seconds while sending, can cancel a send in progress,
   and lists the test sends separately.
+* **Sent** lists every campaign email across all campaigns, newest first,
+  with its status, opens and clicks. Search by address to see everything one
+  person was sent, or filter by campaign, status or test sends.
 * **Audience** shows the segments with recipient counts, the test recipient
   list, the suppression list (add or remove addresses by hand), and, if the
   app doesn't supply its own tags, a table for creating built-in tags and
