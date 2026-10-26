@@ -89,4 +89,17 @@ defmodule CustomerContact.EmailTest do
     token = Phoenix.Token.sign(CustomerContact.TestEndpoint, "customer_contact click", {"id", "javascript:alert(1)"})
     assert Tracking.verify_click(token) == :error
   end
+
+  test "stripping scripts stays fast on unclosed script tags", %{campaign: campaign} do
+    campaign = %{campaign | html_body: String.duplicate("<script>x ", 20_000)}
+    {micros, _} = :timer.tc(fn -> CustomerContact.Email.preview_html(campaign) end)
+    assert micros < 2_000_000, "took #{div(micros, 1000)} ms"
+  end
+
+  test "mask_emails masks every address in an error message" do
+    text = ~s(Email address is not verified: Jane <jane.doe@example.com>, "bob@x.org")
+
+    assert CustomerContact.Log.mask_emails(text) ==
+             ~s(Email address is not verified: Jane <j***@example.com>, "b***@x.org")
+  end
 end

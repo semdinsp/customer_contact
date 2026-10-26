@@ -47,7 +47,7 @@ defmodule CustomerContact.Campaign do
     |> validate_length(:name, max: 200)
     |> validate_length(:subject, max: 250)
     |> validate_length(:preheader, max: 250)
-    |> validate_length(:html_body, max: 1_000_000)
+    |> validate_length(:html_body, max: 500_000)
     |> validate_inclusion(:layout, @layouts)
     |> validate_format(:subject, ~r/\A[^\r\n]*\z/, message: "must be a single line")
     |> validate_format(:preheader, ~r/\A[^\r\n]*\z/, message: "must be a single line")

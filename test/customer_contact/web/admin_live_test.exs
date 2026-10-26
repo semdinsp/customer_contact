@@ -94,7 +94,7 @@ defmodule CustomerContact.Web.AdminLiveTest do
     {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
     assert view |> element("#unsubscribe-2") |> render_click() =~ "Unsubscribed bob@example.com"
     refute has_element?(view, "#unsubscribe-2")
-    assert has_element?(view, "#unsubscribe-1")
+    assert has_element?(view, "#unsubscribe-1 svg")
     assert CustomerContact.Audience.suppressed?("bob@example.com")
     assert [%{email: "alice@example.com"}] = CustomerContact.Audience.deliverable_recipients(["all"])
   end
@@ -122,5 +122,44 @@ defmodule CustomerContact.Web.AdminLiveTest do
 
     {:ok, _view, html} = live(admin_conn(), "/admin/contact/sent?email=%25&status=nonsense&campaign=nope")
     assert html =~ "No emails match."
+  end
+
+  test "tampered admin events are refused without crashing the page" do
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+    render_click(view, "delete_test", %{"id" => "not-a-uuid"})
+    render_click(view, "unsuppress", %{"id" => "not-a-uuid"})
+    assert render_click(view, "unsubscribe", %{"ref" => "no-such-ref"}) =~ "Couldn&#39;t unsubscribe"
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/new")
+
+    for event <- ~w(send_test approve revoke send) do
+      assert render_click(view, event, %{}) =~ "Save the campaign first."
+    end
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/#{campaign_fixture().id}")
+    assert render_click(view, "approve", %{}) =~ "alert"
+  end
+
+  test "duplicate makes a new draft with the same content and no history" do
+    test_recipient_fixture()
+    {:ok, original, _} = CustomerContact.Campaigns.send_test(campaign_fixture(), "a")
+    {:ok, original} = CustomerContact.Campaigns.approve(original, "a", "2")
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/campaigns/#{original.id}")
+    {:error, {:live_redirect, %{to: to}}} = view |> element("#duplicate-campaign") |> render_click()
+    "/admin/contact/campaigns/" <> copy_id = to
+    copy = CustomerContact.Campaigns.get_campaign!(copy_id)
+
+    assert copy.name == "Copy of " <> original.name
+
+    assert {copy.subject, copy.html_body, copy.layout, copy.segment_ids} ==
+             {original.subject, original.html_body, original.layout, original.segment_ids}
+
+    assert %{status: "draft", tested_at: nil, approved_by: nil} = copy
+    assert CustomerContact.Campaigns.get_campaign!(original.id).status == "approved"
+
+    {:ok, view, _} = live(admin_conn(), "/admin/contact")
+    {:error, {:live_redirect, _}} = view |> element("#duplicate-#{original.id}") |> render_click()
+    assert length(CustomerContact.Campaigns.list_campaigns()) == 3
   end
 end

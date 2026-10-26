@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.1.6
+
+* **Duplicate a campaign.** A Duplicate button (copy icon) on the campaign
+  page and on each row of the Campaigns list makes a new draft named
+  "Copy of …" with the same subject, preheader, HTML, layout and audience.
+  Test, approval and send history aren't copied, so the copy goes through
+  the full workflow.
+* **Icons on every button.** Admin buttons and tabs have icons: trash for
+  deletes, a person-minus for Unsubscribe, paper plane for Send, and so on.
+* **Security fixes from the v0.1.5 review:**
+  * The unsubscribe pages show the address masked (`j***@example.com`), since
+    emails get forwarded.
+  * The public pages (unsubscribe, errors) send a strict
+    Content-Security-Policy, `X-Frame-Options: DENY` and `nosniff`.
+  * Email addresses inside mailer error messages are masked before they're
+    logged or stored in Oban's job table.
+  * Malformed HTML with many unclosed links, scripts, styles or comments no
+    longer makes building an email take seconds to minutes. Campaign HTML is
+    now capped at 500 KB (was 1 MB).
+  * Tampered admin events (bad ids, missing fields, actions on an unsaved
+    campaign) are refused with a message instead of crashing the page.
+* **Docs:** don't rotate `secret_key_base` (it breaks unsubscribe links
+  already sent); approval checks the recipient count, not membership.
+
 ## v0.1.5
 
 * **Sent page.** A new **Sent** tab lists every campaign email, newest

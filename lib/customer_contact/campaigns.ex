@@ -27,6 +27,27 @@ defmodule CustomerContact.Campaigns do
     |> repo().insert()
   end
 
+  @doc """
+  Creates a new draft from a campaign's saved content and audience. Test,
+  approval and send history are not copied, so the copy goes through the
+  whole workflow again.
+  """
+  def duplicate_campaign(%Campaign{id: id}, actor) do
+    source = get_campaign!(id)
+
+    create_campaign(
+      %{
+        name: String.slice("Copy of " <> source.name, 0, 200),
+        subject: source.subject,
+        preheader: source.preheader,
+        html_body: source.html_body,
+        layout: source.layout,
+        segment_ids: source.segment_ids
+      },
+      actor
+    )
+  end
+
   # Every workflow step re-reads and row-locks the campaign, so a stale copy
   # (e.g. an editor tab opened before someone else clicked Send) can never
   # change a campaign that has moved on.

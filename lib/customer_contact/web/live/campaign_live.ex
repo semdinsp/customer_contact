@@ -77,6 +77,11 @@ defmodule CustomerContact.Web.CampaignLive do
     end
   end
 
+  def handle_event(event, _params, %{assigns: %{campaign: %{id: nil}}} = socket)
+      when event in ~w(send_test approve revoke send) do
+    {:noreply, put_flash(socket, :error, "Save the campaign first.")}
+  end
+
   def handle_event("send_test", _params, socket) do
     if socket.assigns.dirty do
       {:noreply, put_flash(socket, :error, "Save your changes before sending a test.")}
@@ -113,6 +118,8 @@ defmodule CustomerContact.Web.CampaignLive do
     end
   end
 
+  def handle_event("approve", _params, socket), do: handle_event("approve", %{"count" => ""}, socket)
+
   def handle_event("revoke", _params, socket) do
     {:ok, campaign} = Campaigns.revoke_approval(socket.assigns.campaign)
     {:noreply, socket |> put_flash(:info, "Approval revoked.") |> load(campaign)}
@@ -130,6 +137,24 @@ defmodule CustomerContact.Web.CampaignLive do
 
       {:error, reason} ->
         {:noreply, socket |> put_flash(:error, error_message(reason)) |> load(Campaigns.get_campaign!(campaign.id))}
+    end
+  end
+
+  def handle_event("duplicate", _params, socket) do
+    cond do
+      socket.assigns.campaign.id == nil ->
+        {:noreply, put_flash(socket, :error, "Save the campaign first.")}
+
+      socket.assigns.dirty ->
+        {:noreply, put_flash(socket, :error, "Save your changes before duplicating.")}
+
+      true ->
+        {:ok, copy} = Campaigns.duplicate_campaign(socket.assigns.campaign, socket.assigns.cc_actor)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Duplicated. This is the new copy: edit it, then test and approve it as usual.")
+         |> push_navigate(to: socket.assigns.cc_base <> "/campaigns/" <> copy.id)}
     end
   end
 
@@ -224,12 +249,22 @@ defmodule CustomerContact.Web.CampaignLive do
         <.status_badge :if={@campaign.id} status={@campaign.status} />
         <span :if={@dirty} class="badge badge-warning">unsaved changes</span>
         <div class="grow"></div>
+        <button
+          :if={@campaign.id}
+          type="button"
+          phx-click="duplicate"
+          class="btn btn-sm btn-outline"
+          id="duplicate-campaign"
+          title="Create a new draft from this campaign"
+        >
+          <.icon name="copy" /> Duplicate
+        </button>
         <.link
           :if={@campaign.status in ~w(sending sent cancelled)}
           navigate={@cc_base <> "/campaigns/" <> @campaign.id <> "/report"}
           class="btn btn-sm btn-outline"
         >
-          View report
+          <.icon name="report" /> View report
         </.link>
       </div>
       <div :if={not @postal_address?} role="alert" class="alert alert-warning mb-4" id="missing-postal-address">
@@ -280,7 +315,7 @@ defmodule CustomerContact.Web.CampaignLive do
               </fieldset>
 
               <div class="flex gap-2 pt-2">
-                <button type="submit" class="btn btn-primary" id="save-campaign">Save</button>
+                <button type="submit" class="btn btn-primary" id="save-campaign"><.icon name="save" /> Save</button>
                 <button
                   :if={@campaign.status == "draft"}
                   type="button"
@@ -288,7 +323,7 @@ defmodule CustomerContact.Web.CampaignLive do
                   data-confirm="Delete this draft?"
                   class="btn btn-ghost text-error"
                 >
-                  Delete draft
+                  <.icon name="trash" /> Delete draft
                 </button>
               </div>
             </fieldset>
@@ -316,7 +351,7 @@ defmodule CustomerContact.Web.CampaignLive do
                     id="send-test"
                     disabled={@test_recipients == []}
                   >
-                    Send test
+                    <.icon name="test" /> Send test
                   </button>
                 </div>
               </div>
@@ -329,7 +364,11 @@ defmodule CustomerContact.Web.CampaignLive do
                   <p class="text-sm text-success" id="approved-status">
                     Approved by {@campaign.approved_by} at {format_time(@campaign.approved_at)} for {@campaign.approved_count} recipients.
                   </p>
-                  <div><button phx-click="revoke" class="btn btn-sm btn-ghost">Revoke approval</button></div>
+                  <div>
+                    <button phx-click="revoke" class="btn btn-sm btn-ghost">
+                      <.icon name="undo" /> Revoke approval
+                    </button>
+                  </div>
                 <% else %>
                   <p class="text-sm">
                     This will go to <strong id="deliverable-count">{@deliverable_count}</strong>
@@ -345,7 +384,9 @@ defmodule CustomerContact.Web.CampaignLive do
                       class="input input-sm w-32"
                       placeholder="count"
                     />
-                    <button type="submit" class="btn btn-sm btn-secondary" disabled={!@tested}>Approve</button>
+                    <button type="submit" class="btn btn-sm btn-secondary" disabled={!@tested}>
+                      <.icon name="approve" /> Approve
+                    </button>
                   </form>
                   <p :if={!@tested} class="text-xs opacity-70">Send a test of the current content first.</p>
                 <% end %>
@@ -362,7 +403,7 @@ defmodule CustomerContact.Web.CampaignLive do
                   disabled={!@approved or @dirty}
                   data-confirm={"Send this email to #{@campaign.approved_count} recipients now? This cannot be undone."}
                 >
-                  Send to {@campaign.approved_count || 0} recipients
+                  <.icon name="send" /> Send to {@campaign.approved_count || 0} recipients
                 </button>
               </div>
             </div>

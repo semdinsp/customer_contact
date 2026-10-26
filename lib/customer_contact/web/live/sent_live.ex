@@ -125,7 +125,7 @@ defmodule CustomerContact.Web.SentLive do
                   navigate={@cc_base <> "/campaigns/" <> d.campaign_id <> "/report"}
                   class="btn btn-ghost btn-xs"
                 >
-                  Report
+                  <.icon name="report" /> Report
                 </.link>
               </td>
               <td><.status_badge status={d.status} /></td>
@@ -142,7 +142,7 @@ defmodule CustomerContact.Web.SentLive do
         class="btn btn-sm btn-ghost mt-2"
         id="sent-more"
       >
-        Show more
+        <.icon name="more" /> Show more
       </button>
     </.shell>
     """

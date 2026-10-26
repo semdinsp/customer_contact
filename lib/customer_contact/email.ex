@@ -70,7 +70,9 @@ defmodule CustomerContact.Email do
     end)
   end
 
-  defp strip_scripts(html), do: String.replace(html, ~r/<script\b[^>]*>.*?<\/script\s*>/is, "")
+  # The (?!<script) guard stops an unclosed <script> from rescanning the rest of
+  # the HTML for every later one, which made this quadratic on bad input.
+  defp strip_scripts(html), do: String.replace(html, ~r/<script\b[^>]*>(?:(?!<script\b).)*?<\/script\s*>/is, "")
 
   defp merge_html(html, delivery, unsubscribe_url) do
     Regex.replace(@merge, html, fn whole, field, fallback ->

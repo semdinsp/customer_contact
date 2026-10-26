@@ -18,4 +18,12 @@ defmodule CustomerContact.HTMLTextTest do
     assert text =~ "Link (https://x.test/?a=1&b=2) — ©"
     refute text =~ "color:red"
   end
+
+  test "stays fast on HTML full of unclosed tags" do
+    for chunk <- [~s(<a href="https://x.com">x ), "<script>x ", "<!-- x ", "<style>x "] do
+      html = String.duplicate(chunk, div(200_000, byte_size(chunk)))
+      {micros, _} = :timer.tc(fn -> CustomerContact.HTMLText.convert(html) end)
+      assert micros < 2_000_000, "#{inspect(chunk)} took #{div(micros, 1000)} ms"
+    end
+  end
 end

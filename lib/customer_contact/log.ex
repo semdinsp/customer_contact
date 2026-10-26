@@ -32,6 +32,10 @@ defmodule CustomerContact.Log do
 
   def mask_email(_), do: nil
 
+  @doc "Masks every email address inside free text, such as a mailer error message."
+  def mask_emails(text) when is_binary(text),
+    do: Regex.replace(~r/[^\s<>"'(),;:\[\]]+@[^\s<>"'(),;:\[\]]+/, text, &mask_email/1)
+
   defp line(message, meta) do
     pairs = for {key, value} <- meta, not is_nil(value), do: "#{key}=#{format(value)}"
     Enum.join(["[CustomerContact] " <> message | pairs], " ")
