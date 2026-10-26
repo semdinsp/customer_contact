@@ -25,7 +25,8 @@ refused) appear at the top of the page and pinned to the bottom corner of the
 screen.
 
 * **Campaigns** lists every campaign with its status and, once sent, how many
-  were sent, opened and clicked.
+  were sent, opened and clicked. **Duplicate** makes a new draft from any campaign
+  (same content and audience, no test or approval history).
 * **Campaign editor** has a name, subject, optional preheader (the preview
   line inboxes show after the subject), the HTML, a layout choice and the
   audience. A live preview shows the email as recipients will see it. Beside

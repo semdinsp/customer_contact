@@ -2,6 +2,11 @@
 
 ## v0.1.6
 
+* **Duplicate a campaign.** A Duplicate button (copy icon) on the campaign
+  page and on each row of the Campaigns list makes a new draft named
+  "Copy of …" with the same subject, preheader, HTML, layout and audience.
+  Test, approval and send history aren't copied, so the copy goes through
+  the full workflow.
 * **Icons on every button.** Admin buttons and tabs have icons: trash for
   deletes, a person-minus for Unsubscribe, paper plane for Send, and so on.
 * **Security fixes from the v0.1.5 review:**
