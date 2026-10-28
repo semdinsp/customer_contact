@@ -4,9 +4,12 @@ defmodule CustomerContact.Web.AudienceLive do
 
   import CustomerContact.Web.Components
 
-  alias CustomerContact.{Audience, Log}
+  alias CustomerContact.{Audience, CSV, Log}
 
   @shown 200
+  @max_import_bytes 2_000_000
+  @max_import_rows 10_000
+  @sample_csv "email,name\r\njane@example.com,Jane Doe\r\n\"lee@example.org\",\"Lee, Sam\"\r\n"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -16,6 +19,8 @@ defmodule CustomerContact.Web.AudienceLive do
      |> assign(test_form: to_form(Audience.change_test_recipient(), as: :test_recipient))
      |> assign(tag_form: to_form(Audience.change_tag(), as: :tag))
      |> assign(contact_form: to_form(Audience.change_contact(), as: :contact))
+     |> assign(import_form: import_form(), import_result: nil)
+     |> allow_upload(:csv, accept: ~w(.csv), max_entries: 1, max_file_size: @max_import_bytes)
      |> load()}
   end
 
@@ -74,6 +79,33 @@ defmodule CustomerContact.Web.AudienceLive do
         {:noreply, assign(socket, contact_form: to_form(changeset, as: :contact))}
     end
   end
+
+  def handle_event("validate_import", %{"import" => params}, socket) do
+    {:noreply, assign(socket, import_form: import_form(params))}
+  end
+
+  def handle_event("import", %{"import" => params}, socket) do
+    tag_id = if params["tag_id"] in [nil, ""] or socket.assigns.host_segments, do: nil, else: params["tag_id"]
+
+    cond do
+      socket.assigns.uploads.csv.entries == [] ->
+        {:noreply, socket |> assign(import_form: import_form(params)) |> put_flash(:error, "Choose a CSV file first.")}
+
+      params["consent"] != "true" ->
+        {:noreply,
+         socket
+         |> assign(import_form: import_form(params))
+         |> put_flash(:error, "Confirm that everyone in the file agreed to receive your emails.")}
+
+      true ->
+        case consume_uploaded_entries(socket, :csv, fn %{path: path}, _ -> {:ok, CSV.parse_people(File.read!(path))} end) do
+          [parsed] -> {:noreply, socket |> run_import(parsed, tag_id) |> assign(import_form: import_form()) |> load()}
+          [] -> {:noreply, put_flash(socket, :error, "That file couldn't be uploaded. Choose it again.")}
+        end
+    end
+  end
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket), do: {:noreply, cancel_upload(socket, :csv, ref)}
 
   def handle_event("delete_contact", %{"id" => id}, socket) do
     case Enum.find(socket.assigns.contacts, &(&1.id == id)) do
@@ -135,6 +167,52 @@ defmodule CustomerContact.Web.AudienceLive do
 
   def handle_event("search", %{"q" => q}, socket), do: {:noreply, assign(socket, search: q)}
 
+  defp run_import(socket, {:error, message}, _tag_id), do: put_flash(socket, :error, message)
+
+  defp run_import(socket, {:ok, rows}, _tag_id) when length(rows) > @max_import_rows,
+    do: put_flash(socket, :error, "That file has #{length(rows)} people. Import at most #{@max_import_rows} at a time.")
+
+  defp run_import(socket, {:ok, []}, _tag_id), do: put_flash(socket, :error, "That file has no people in it.")
+
+  defp run_import(socket, {:ok, rows}, tag_id) do
+    actor = socket.assigns.cc_actor
+
+    case Audience.import_contacts(rows, actor, tag_id) do
+      {:ok, result} ->
+        tag = tag_id && Enum.find(socket.assigns.tags, &(&1.id == tag_id))
+        Log.info("contacts imported by admin", added: result.added, tagged: result.tagged, by: actor)
+
+        socket
+        |> assign(import_result: Map.put(result, :tag, tag && tag.name))
+        |> put_flash(:info, import_summary(result))
+
+      {:error, :unknown_tag} ->
+        put_flash(socket, :error, "That tag no longer exists. Nothing was imported.")
+    end
+  end
+
+  defp import_summary(r) do
+    "Imported #{r.added} new #{people(r.added)}; #{r.existing} already in the audience." <>
+      if(r.invalid == [],
+        do: "",
+        else: " Skipped #{length(r.invalid)} #{rows(length(r.invalid))} without a valid email."
+      )
+  end
+
+  defp people(1), do: "person"
+  defp people(_), do: "people"
+  defp rows(1), do: "row"
+  defp rows(_), do: "rows"
+
+  defp import_form(params \\ %{}), do: to_form(Map.take(params, ["tag_id", "consent"]), as: :import)
+
+  defp sample_csv_href, do: "data:text/csv;charset=utf-8," <> URI.encode(@sample_csv, &URI.char_unreserved?/1)
+
+  defp upload_error(:too_large), do: "That file is over 2 MB. Split it into smaller files."
+  defp upload_error(:not_accepted), do: "Choose a .csv file."
+  defp upload_error(:too_many_files), do: "Choose one file at a time."
+  defp upload_error(_), do: "That file couldn't be uploaded."
+
   defp filtered(recipients, ""), do: Enum.take(recipients, @shown)
 
   defp filtered(recipients, q) do
@@ -147,6 +225,8 @@ defmodule CustomerContact.Web.AudienceLive do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, max_import_rows: @max_import_rows, sample_csv: @sample_csv)
+
     ~H"""
     <.shell flash={@flash} base={@cc_base} home={@cc_home} active={:audience}>
       <:help>
@@ -168,6 +248,14 @@ defmodule CustomerContact.Web.AudienceLive do
             and the <em>Added manually</em>
             segment. <em>Remove</em>
             takes them out again.
+          </li>
+          <li>
+            <strong>Import from a CSV file</strong>
+            to add many people at once: a spreadsheet saved as CSV with an <em>email</em>
+            column and, optionally, a <em>name</em>
+            column.<span :if={!@host_segments}> Pick a tag to give everyone in the file that tag.</span>
+            Open <em>Guide: preparing your file</em>
+            in that block for the details.
           </li>
           <li :if={!@host_segments}>
             <strong>Tags</strong>
@@ -253,6 +341,152 @@ defmodule CustomerContact.Web.AudienceLive do
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+
+        <section class="card bg-base-200 lg:col-span-2" id="import">
+          <div class="card-body p-4">
+            <h2 class="font-semibold">Import people from a CSV file</h2>
+            <p class="text-xs opacity-70">
+              Adds everyone in the file the same way as <em>Add a person</em>. People already in the audience
+              aren't added twice<span :if={!@host_segments}>, but they do get the tag you pick</span>.
+            </p>
+            <.form
+              for={@import_form}
+              phx-change="validate_import"
+              phx-submit="import"
+              class="flex flex-wrap items-end gap-2"
+              id="import-form"
+            >
+              <fieldset class="fieldset">
+                <label class="label" for={@uploads.csv.ref}>CSV file</label>
+                <.live_file_input upload={@uploads.csv} class="file-input file-input-sm" />
+              </fieldset>
+              <fieldset :if={!@host_segments} class="fieldset">
+                <label class="label" for="import_tag_id">Tag everyone with</label>
+                <select id="import_tag_id" name={@import_form[:tag_id].name} class="select select-sm">
+                  <option value="">No tag</option>
+                  <option :for={t <- @tags} value={t.id} selected={@import_form[:tag_id].value == t.id}>{t.name}</option>
+                </select>
+              </fieldset>
+              <div class="w-full">
+                <.input
+                  field={@import_form[:consent]}
+                  type="checkbox"
+                  label="Everyone in this file agreed to receive our emails"
+                />
+              </div>
+              <div :for={entry <- @uploads.csv.entries} class="w-full text-sm flex items-center gap-2">
+                <span>{entry.client_name}</span>
+                <span :for={err <- upload_errors(@uploads.csv, entry)} class="text-error">{upload_error(err)}</span>
+                <button
+                  type="button"
+                  phx-click="cancel_upload"
+                  phx-value-ref={entry.ref}
+                  class="btn btn-ghost btn-xs"
+                  aria-label="Remove file"
+                >
+                  <.icon name="close" />
+                </button>
+              </div>
+              <p :for={err <- upload_errors(@uploads.csv)} class="w-full text-error text-sm">{upload_error(err)}</p>
+              <button class="btn btn-sm btn-secondary mb-2" id="import-csv"><.icon name="upload" /> Import</button>
+            </.form>
+
+            <div :if={@import_result} class="text-sm" id="import-result">
+              <p>
+                <strong>{@import_result.added}</strong>
+                added, <strong>{@import_result.existing}</strong>
+                already in the audience<span :if={@import_result.tag}>,
+                  <strong>{@import_result.tagged}</strong> newly tagged <em>{@import_result.tag}</em></span>.
+              </p>
+              <p :if={@import_result.invalid != []} class="text-warning">
+                Skipped rows without a valid email: {Enum.join(Enum.take(@import_result.invalid, 50), ", ")}<span :if={
+                  length(@import_result.invalid) > 50
+                }> and {length(@import_result.invalid) - 50} more</span>.
+              </p>
+            </div>
+
+            <details class="text-sm mt-2" id="import-guide">
+              <summary class="cursor-pointer font-medium">Guide: preparing your file</summary>
+              <div class="mt-2 space-y-3">
+                <div>
+                  <h3 class="font-semibold">What the file needs</h3>
+                  <ul class="list-disc pl-5 space-y-1">
+                    <li>
+                      A <strong>CSV file</strong> (comma-separated values), up to 2 MB and {@max_import_rows} people.
+                    </li>
+                    <li>
+                      A <strong>header row</strong> first, naming the columns. Capitals and the column order don't matter.
+                    </li>
+                    <li>
+                      An <strong>email</strong> column (also accepted: <em>e-mail</em>, <em>email address</em>). Required.
+                    </li>
+                    <li>
+                      A <strong>name</strong>
+                      column (or <em>full name</em>), optional. If you have separate <em>first name</em>
+                      and <em>last name</em>
+                      columns instead, they're joined.
+                    </li>
+                    <li>Any other columns are ignored, so you can export a whole sheet as it is.</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3 class="font-semibold">Example</h3>
+                  <pre class="bg-base-100 rounded p-2 text-xs overflow-x-auto">{String.replace(@sample_csv, "\r\n", "\n")}</pre>
+                  <p class="text-xs opacity-70">Put a value in double quotes if it contains a comma.</p>
+                  <a
+                    href={sample_csv_href()}
+                    download="audience-import-template.csv"
+                    class="link text-xs"
+                    id="import-template"
+                  >
+                    Download this example as a template
+                  </a>
+                </div>
+                <div>
+                  <h3 class="font-semibold">Saving a CSV from a spreadsheet</h3>
+                  <ul class="list-disc pl-5 space-y-1">
+                    <li><strong>Excel:</strong> File → Save As → <em>CSV UTF-8 (Comma delimited)</em>.</li>
+                    <li><strong>Google Sheets:</strong> File → Download → <em>Comma-separated values (.csv)</em>.</li>
+                    <li>
+                      <strong>Numbers:</strong> File → Export To → <em>CSV…</em>, text encoding <em>Unicode (UTF-8)</em>.
+                    </li>
+                  </ul>
+                  <p class="text-xs opacity-70">
+                    Files using semicolons instead of commas (some European Excel settings) also work.
+                  </p>
+                </div>
+                <div>
+                  <h3 class="font-semibold">What happens when you import</h3>
+                  <ul class="list-disc pl-5 space-y-1">
+                    <li>
+                      Each new address is added to <em>Everyone</em>
+                      and <em>Added manually</em>, recorded as added by you with your consent confirmation.
+                    </li>
+                    <li>
+                      Addresses already in the audience (from this app or added earlier) aren't added again.
+                      An address listed twice in the file counts once.
+                    </li>
+                    <li :if={!@host_segments}>
+                      With a tag picked, <strong>everyone in the file</strong>
+                      gets it, including people already in the audience. Create the tag in <em>Tags</em>
+                      below first.
+                    </li>
+                    <li>Rows with a missing or invalid email are skipped and listed by row number after the import.</li>
+                    <li>
+                      People on the <strong>suppression list</strong>
+                      are added but still won't be emailed. Importing never re-subscribes anyone.
+                    </li>
+                    <li>
+                      Only import people who agreed to receive your emails, e.g. a sign-up sheet. Bought or scraped
+                      lists get complaints, and complaints can get your sending suspended.
+                    </li>
+                    <li>To undo, remove people one by one in the list above.</li>
+                  </ul>
+                </div>
+              </div>
+            </details>
           </div>
         </section>
 

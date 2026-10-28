@@ -200,4 +200,55 @@ defmodule CustomerContact.Web.AdminLiveTest do
     assert CustomerContact.Audience.list_contacts() == []
     refute "new@example.org" in emails.(["all"])
   end
+
+  defp upload_csv(view, content) do
+    file_input(view, "#import-form", :csv, [%{name: "people.csv", content: content, type: "text/csv"}])
+  end
+
+  test "admins can import people from a CSV file and tag them" do
+    {:ok, tag} = CustomerContact.Audience.create_tag(%{name: "Fair 2026"})
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+    assert has_element?(view, "#import-guide")
+    csv = "Email,Name\r\nnew@example.org,Nina New\r\nbob@example.com,Bob\r\nnot-an-email,X\r\nNEW@example.org,Again\r\n"
+
+    upload = upload_csv(view, csv)
+    render_upload(upload, "people.csv")
+    html = view |> form("#import-form", import: %{tag_id: tag.id}) |> render_submit()
+    assert html =~ "Confirm that everyone in the file agreed"
+    assert CustomerContact.Audience.list_contacts() == []
+
+    html = view |> form("#import-form", import: %{tag_id: tag.id, consent: "true"}) |> render_submit()
+    assert html =~ "Imported 1 new person; 1 already in the audience. Skipped 1 row without a valid email."
+    assert has_element?(view, "#import-result", "2 newly tagged")
+
+    assert [%{email: "new@example.org", name: "Nina New", added_by: "admin@example.test"} = contact] =
+             CustomerContact.Audience.list_contacts()
+
+    assert contact.consent_note =~ "CSV import"
+    tagged = CustomerContact.Audience.deliverable_recipients(["tag:" <> tag.id]) |> Enum.map(& &1.email) |> Enum.sort()
+    assert tagged == ["bob@example.com", "new@example.org"]
+
+    # Importing again adds and tags no one twice.
+    render_upload(upload_csv(view, csv), "people.csv")
+    html = view |> form("#import-form", import: %{tag_id: tag.id, consent: "true"}) |> render_submit()
+    assert html =~ "Imported 0 new people; 2 already in the audience."
+    assert has_element?(view, "#import-result", "0 newly tagged")
+  end
+
+  test "a CSV import without an email column or with an unknown tag imports no one" do
+    {:ok, view, _} = live(admin_conn(), "/admin/contact/audience")
+
+    render_upload(upload_csv(view, "name\nJane\n"), "people.csv")
+    html = view |> form("#import-form", import: %{consent: "true"}) |> render_submit()
+    assert html =~ "The first row must be a header with an email column."
+
+    assert {:error, :unknown_tag} =
+             CustomerContact.Audience.import_contacts(
+               [%{line: 2, email: "a@example.com", name: nil}],
+               "admin",
+               Ecto.UUID.generate()
+             )
+
+    assert CustomerContact.Audience.list_contacts() == []
+  end
 end

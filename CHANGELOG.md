@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.8
+
+No migration needed.
+
+* **Import people from a CSV file.** The Audience page has an import block:
+  choose a `.csv` file (up to 2 MB and 10,000 people) with a header row, an
+  `email` column and an optional `name` column (or `first name` and
+  `last name`), tick the box confirming everyone agreed to receive emails,
+  and optionally pick an existing built-in tag to give everyone in the file.
+  New addresses become hand-added people; addresses already in the audience
+  aren't added twice but do get the tag. Rows without a valid email are
+  skipped and listed by row number. Quoted fields, Excel's UTF-8 byte order
+  mark and semicolon-separated files are handled. Imports are logged.
+* **Import guide.** The import block has a *Guide: preparing your file*
+  section (columns, an example with a downloadable template, how to save CSV
+  from Excel, Google Sheets and Numbers, and what an import does), and the
+  page's help (?) mentions importing.
+* `CustomerContact.Audience.import_contacts/3` for importing from code.
+
 ## v0.1.7
 
 **Needs a migration.** Add a host migration calling
