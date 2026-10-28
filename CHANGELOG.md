@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.9
+
+No migration needed.
+
+* **Clearer skipped-rows message after a CSV import.** The result said
+  "Skipped rows without a valid email: 4." where 4 was a line number in the
+  file, which read like a count. It now says "Skipped 1 row without a valid
+  email (line 4 of the file)." (or "lines 4, 7, 9"; long lists stop after 50
+  with "and N more").
+
 ## v0.1.8
 
 No migration needed.
