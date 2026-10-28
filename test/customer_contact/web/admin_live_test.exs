@@ -220,6 +220,7 @@ defmodule CustomerContact.Web.AdminLiveTest do
     html = view |> form("#import-form", import: %{tag_id: tag.id, consent: "true"}) |> render_submit()
     assert html =~ "Imported 1 new person; 1 already in the audience. Skipped 1 row without a valid email."
     assert has_element?(view, "#import-result", "2 newly tagged")
+    assert has_element?(view, "#import-skipped", "Skipped 1 row without a valid email (line 4 of the file).")
 
     assert [%{email: "new@example.org", name: "Nina New", added_by: "admin@example.test"} = contact] =
              CustomerContact.Audience.list_contacts()
@@ -241,6 +242,10 @@ defmodule CustomerContact.Web.AdminLiveTest do
     render_upload(upload_csv(view, "name\nJane\n"), "people.csv")
     html = view |> form("#import-form", import: %{consent: "true"}) |> render_submit()
     assert html =~ "The first row must be a header with an email column."
+
+    render_upload(upload_csv(view, "email\na@example.com\n"), "people.csv")
+    view |> form("#import-form", import: %{consent: "false"}) |> render_submit()
+    assert has_element?(view, "#cc-flash-error", "Confirm that everyone in the file agreed")
 
     assert {:error, :unknown_tag} =
              CustomerContact.Audience.import_contacts(

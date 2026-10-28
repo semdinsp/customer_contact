@@ -199,6 +199,14 @@ defmodule CustomerContact.Web.AudienceLive do
       )
   end
 
+  defp skipped_lines(lines) do
+    n = length(lines)
+    shown = lines |> Enum.take(50) |> Enum.join(", ")
+    more = if n > 50, do: " and #{n - 50} more", else: ""
+
+    "Skipped #{n} #{rows(n)} without a valid email (#{if n == 1, do: "line", else: "lines"} #{shown}#{more} of the file)."
+  end
+
   defp people(1), do: "person"
   defp people(_), do: "people"
   defp rows(1), do: "row"
@@ -400,10 +408,8 @@ defmodule CustomerContact.Web.AudienceLive do
                 already in the audience<span :if={@import_result.tag}>,
                   <strong>{@import_result.tagged}</strong> newly tagged <em>{@import_result.tag}</em></span>.
               </p>
-              <p :if={@import_result.invalid != []} class="text-warning">
-                Skipped rows without a valid email: {Enum.join(Enum.take(@import_result.invalid, 50), ", ")}<span :if={
-                  length(@import_result.invalid) > 50
-                }> and {length(@import_result.invalid) - 50} more</span>.
+              <p :if={@import_result.invalid != []} class="text-warning" id="import-skipped">
+                {skipped_lines(@import_result.invalid)}
               </p>
             </div>
 
