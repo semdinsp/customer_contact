@@ -160,6 +160,97 @@ defmodule CustomerContact.Audience do
     end
   end
 
+  @doc """
+  Adds the people in `rows` (`%{line:, email:, name:}`, from
+  `CustomerContact.CSV.parse_people/1`) as hand-added contacts, and gives every
+  listed address the built-in tag `tag_id` if one is given, including people
+  who were already in the audience.
+
+  Returns `{:ok, %{added:, existing:, tagged:, invalid: [line]}}`. Addresses
+  repeated in the file count once; `existing` is people already in the
+  audience and `tagged` is people who didn't already have the tag. `{:error, :unknown_tag}` if the tag doesn't exist.
+  """
+  def import_contacts(rows, actor, tag_id \\ nil) do
+    with :ok <- check_tag(tag_id) do
+      {valid, invalid} =
+        rows
+        |> Enum.map(&%{&1 | email: normalize_email(&1.email)})
+        |> Enum.split_with(&(valid_email?(&1.email) and String.length(&1.email) <= 160))
+
+      valid = Enum.uniq_by(valid, & &1.email)
+
+      host_refs =
+        CustomerContact.host().list_recipients()
+        |> Enum.filter(& &1.email)
+        |> Enum.group_by(&normalize_email(&1.email), &to_string(&1.ref))
+
+      {:ok, result} =
+        repo().transaction(fn ->
+          new = Enum.reject(valid, &Map.has_key?(host_refs, &1.email))
+          added = insert_contacts(new, actor)
+          contact_ids = contact_ids_by_email(Enum.map(new, & &1.email))
+
+          tagged =
+            if tag_id do
+              valid
+              |> Enum.flat_map(&(Map.get(host_refs, &1.email) || ["manual:" <> Map.fetch!(contact_ids, &1.email)]))
+              |> tag_refs(tag_id)
+            else
+              0
+            end
+
+          %{added: added, existing: length(valid) - added, tagged: tagged, invalid: Enum.map(invalid, & &1.line)}
+        end)
+
+      {:ok, result}
+    end
+  end
+
+  defp check_tag(nil), do: :ok
+
+  defp check_tag(tag_id) do
+    if valid_uuid?(tag_id) and repo().exists?(from t in Tag, where: t.id == ^tag_id),
+      do: :ok,
+      else: {:error, :unknown_tag}
+  end
+
+  defp insert_contacts(rows, actor) do
+    now = now()
+
+    rows
+    |> Enum.map(fn r ->
+      %{
+        email: r.email,
+        name: r.name && String.slice(r.name, 0, 120),
+        added_by: actor,
+        consent_note: "Consent confirmed by #{actor} (CSV import)",
+        inserted_at: now,
+        updated_at: now
+      }
+    end)
+    |> Enum.chunk_every(1_000)
+    |> Enum.map(&elem(repo().insert_all(Contact, &1, on_conflict: :nothing, conflict_target: :email), 0))
+    |> Enum.sum()
+  end
+
+  defp contact_ids_by_email(emails) do
+    emails
+    |> Enum.chunk_every(5_000)
+    |> Enum.flat_map(&repo().all(from c in Contact, where: c.email in ^&1, select: {c.email, c.id}))
+    |> Map.new()
+  end
+
+  defp tag_refs(refs, tag_id) do
+    now = now()
+
+    refs
+    |> Enum.uniq()
+    |> Enum.map(&%{tag_id: tag_id, recipient_ref: &1, inserted_at: now})
+    |> Enum.chunk_every(5_000)
+    |> Enum.map(&elem(repo().insert_all(Tagging, &1, on_conflict: :nothing), 0))
+    |> Enum.sum()
+  end
+
   @doc "Removes a hand-added person and their tags. Doesn't suppress the address."
   def delete_contact(id) do
     if valid_uuid?(id) do
