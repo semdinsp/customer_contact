@@ -40,7 +40,10 @@ screen.
   with its status, opens and clicks. Search by address to see everything one
   person was sent, or filter by campaign, status or test sends.
 * **Audience** has an **Add a person** form for people who aren't in the
-  app's own records, and shows the segments with recipient counts, the test recipient
+  app's own records, an **Import from a CSV file** block for adding many at
+  once (an `email` column and an optional `name` column, optionally giving
+  everyone in the file an existing built-in tag, with a guide to preparing the
+  file and a template to download), and shows the segments with recipient counts, the test recipient
   list, the suppression list (add or remove addresses by hand), and, if the
   app doesn't supply its own tags, a table for creating built-in tags and
   ticking which customers have them. Each row of that table has an
@@ -168,7 +171,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.7"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.8"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)
