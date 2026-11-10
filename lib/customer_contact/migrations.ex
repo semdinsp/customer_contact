@@ -27,11 +27,12 @@ defmodule CustomerContact.Migrations do
 
     1. campaigns, deliveries, events, suppressions, test recipients, tags
     2. contacts (people added by hand on the Audience page)
+    3. images (uploaded on the Images page, served for use in emails)
   """
 
   use Ecto.Migration
 
-  @latest 2
+  @latest 3
 
   def latest_version, do: @latest
 
@@ -47,7 +48,7 @@ defmodule CustomerContact.Migrations do
 
   # Each version is recognised by the table it creates.
   defp applied?(version) do
-    table = Map.fetch!(%{1 => "cc_campaigns", 2 => "cc_contacts"}, version)
+    table = Map.fetch!(%{1 => "cc_campaigns", 2 => "cc_contacts", 3 => "cc_images"}, version)
     %{rows: [[exists?]]} = repo().query!("SELECT to_regclass($1) IS NOT NULL", [table], log: false)
     exists?
   end
@@ -171,6 +172,28 @@ defmodule CustomerContact.Migrations do
     end
 
     create unique_index(:cc_contacts, [:email])
+  end
+
+  defp change(3, :up) do
+    create table(:cc_images, primary_key: false) do
+      add :id, :binary_id, primary_key: true
+      add :filename, :string, null: false
+      add :content_type, :string, null: false
+      add :byte_size, :integer, null: false
+      add :width, :integer
+      add :height, :integer
+      add :sha256, :string, null: false
+      add :data, :binary, null: false
+      add :uploaded_by, :string
+      timestamps(type: :utc_datetime)
+    end
+
+    create index(:cc_images, [:inserted_at])
+    create unique_index(:cc_images, [:sha256])
+  end
+
+  defp change(3, :down) do
+    drop table(:cc_images)
   end
 
   defp change(2, :down) do

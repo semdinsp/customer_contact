@@ -226,6 +226,11 @@ defmodule CustomerContact.Web.CampaignLive do
             and <code>{"{{email}}"}</code>
             are filled in for each person. Add a fallback for people without one: <code>{"{{first_name|friend}}"}</code>.
           </li>
+          <li>
+            <strong>Add pictures (optional):</strong>
+            upload them on the <.link navigate={@cc_base <> "/images"} class="link">Images</.link>
+            page, then paste the HTML it gives you into the email HTML.
+          </li>
           <li><strong>Choose who it goes to</strong> under "Send to", then <strong>Save</strong>.</li>
           <li>
             <strong>Send a test.</strong>
@@ -297,6 +302,11 @@ defmodule CustomerContact.Web.CampaignLive do
                 rows="16"
                 phx-debounce="600"
               />
+              <p class="text-xs opacity-70" id="images-hint">
+                To add a picture, upload it on the
+                <.link navigate={@cc_base <> "/images"} class="link">Images</.link>
+                page and paste its HTML here.
+              </p>
 
               <fieldset class="fieldset">
                 <legend class="fieldset-legend">Send to</legend>
