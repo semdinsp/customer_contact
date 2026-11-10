@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.11
+
+No migration needed.
+
+* **Security: newer minimum dependency versions.** The library now
+  requires `phoenix_html` 4.4.0 or later (fixes EEF-CVE-2026-117645,
+  attribute injection through unvalidated attribute names in
+  `attributes_escape/1`) and `ecto` 3.14.3 or later (fixes
+  EEF-CVE-2026-118391, unbounded query cache growth). Upgrading the library
+  pulls these in; an app pinned below them will need to update them too.
+
 ## v0.1.10
 
 **Needs a migration.** Add a host migration calling

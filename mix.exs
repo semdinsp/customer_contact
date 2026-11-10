@@ -1,7 +1,7 @@
 defmodule CustomerContact.MixProject do
   use Mix.Project
 
-  @version "0.1.10"
+  @version "0.1.11"
   @source_url "https://github.com/semdinsp/customer_contact"
 
   def project do
@@ -32,8 +32,11 @@ defmodule CustomerContact.MixProject do
     [
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:phoenix_html, "~> 4.1"},
+      # 4.4.0 fixes EEF-CVE-2026-117645 (attribute injection in attributes_escape/1).
+      {:phoenix_html, "~> 4.4"},
       {:ecto_sql, "~> 3.12"},
+      # 3.14.3 fixes EEF-CVE-2026-118391 (unbounded query cache growth).
+      {:ecto, "~> 3.14 and >= 3.14.3"},
       {:phoenix_ecto, "~> 4.5"},
       {:postgrex, ">= 0.0.0"},
       {:swoosh, "~> 1.16"},
