@@ -180,7 +180,7 @@ Fly logs (`fly logs`, or the dashboard) as well as from the report page:
 
 ```elixir
 # mix.exs
-{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.10"}
+{:customer_contact, github: "semdinsp/customer_contact", tag: "v0.1.11"}
 
 # migration
 def up, do: CustomerContact.Migrations.up(version: 1)
