@@ -217,4 +217,19 @@ defmodule CustomerContact.Web.PublicPlugTest do
       assert response(post_sns(msg), 403)
     end
   end
+
+  test "serves an uploaded image with long caching and locked-down headers" do
+    {:ok, image} = CustomerContact.Images.create_image(png_fixture(), "logo.png", "admin")
+
+    conn = get(build_conn(), path(CustomerContact.Images.url(image)))
+    assert response(conn, 200) == png_fixture()
+    assert get_resp_header(conn, "content-type") == ["image/png"]
+    assert get_resp_header(conn, "cache-control") == ["public, max-age=31536000, immutable"]
+    assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+
+    # The filename part doesn't matter; unknown or malformed ids are 404s.
+    assert response(get(build_conn(), "/cc/i/#{image.id}/anything.png"), 200)
+    assert response(get(build_conn(), "/cc/i/#{Ecto.UUID.generate()}/logo.png"), 404)
+    assert response(get(build_conn(), "/cc/i/nope/logo.png"), 404)
+  end
 end

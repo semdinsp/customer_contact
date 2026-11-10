@@ -35,6 +35,13 @@ defmodule CustomerContact.DataCase do
     campaign
   end
 
+  @png Base.decode64!(
+         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+       )
+
+  @doc "A 1x1 PNG."
+  def png_fixture, do: @png
+
   def test_recipient_fixture(email \\ "tester@example.test") do
     {:ok, tr} = CustomerContact.Audience.add_test_recipient(%{email: email, name: "Tester"})
     tr

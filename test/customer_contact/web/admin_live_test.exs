@@ -256,4 +256,48 @@ defmodule CustomerContact.Web.AdminLiveTest do
 
     assert CustomerContact.Audience.list_contacts() == []
   end
+
+  describe "images page" do
+    test "upload an image, get its HTML, and delete it" do
+      {:ok, view, _html} = live(admin_conn(), "/admin/contact/images")
+      assert has_element?(view, "#no-images")
+
+      upload =
+        file_input(view, "#upload-form", :image, [
+          %{name: "logo.png", content: png_fixture(), type: "image/png"}
+        ])
+
+      render_upload(upload, "logo.png")
+      view |> form("#upload-form") |> render_submit()
+
+      assert has_element?(view, "#cc-flash-info", "Image uploaded.")
+      [image] = CustomerContact.Images.list_images()
+      assert has_element?(view, "#image-html-#{image.id}", CustomerContact.Images.url(image))
+      assert has_element?(view, ~s|#image-url-#{image.id}[value="#{CustomerContact.Images.url(image)}"]|)
+
+      view |> element("#image-#{image.id} button", "Delete") |> render_click()
+      assert has_element?(view, "#cc-flash-info", "Image deleted.")
+      assert has_element?(view, "#no-images")
+    end
+
+    test "a file that isn't really an image is refused" do
+      {:ok, view, _html} = live(admin_conn(), "/admin/contact/images")
+
+      upload =
+        file_input(view, "#upload-form", :image, [
+          %{name: "evil.png", content: "<svg/onload=alert(1)>", type: "image/png"}
+        ])
+
+      render_upload(upload, "evil.png")
+      view |> form("#upload-form") |> render_submit()
+
+      assert has_element?(view, "#cc-flash-error", "evil.png: it isn't a PNG, JPEG, GIF or WebP image.")
+      assert CustomerContact.Images.list_images() == []
+    end
+
+    test "the campaign editor links to the images page" do
+      {:ok, view, _html} = live(admin_conn(), "/admin/contact/campaigns/new")
+      assert has_element?(view, ~s|#images-hint a[href="/admin/contact/images"]|)
+    end
+  end
 end

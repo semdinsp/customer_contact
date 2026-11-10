@@ -19,7 +19,7 @@ in [`CHANGELOG.md`](CHANGELOG.md).
 
 The pages live wherever the app mounts them (usually `/admin/contact`). The
 header has a home icon back to the app's admin dashboard, tabs for Campaigns,
-Sent and Audience, and a help icon (?) that opens a short guide to the current page.
+Sent, Audience and Images, and a help icon (?) that opens a short guide to the current page.
 Messages (saved, test sent, why something was
 refused) appear at the top of the page and pinned to the bottom corner of the
 screen.
@@ -48,6 +48,15 @@ screen.
   app doesn't supply its own tags, a table for creating built-in tags and
   ticking which customers have them. Each row of that table has an
   **Unsubscribe** button that adds the person to the suppression list.
+
+* **Images** stores pictures for campaigns in the app's database. Upload
+  PNG, JPEG, GIF or WebP files (up to 5 MB each, several at once); each gets a
+  public address under `{public_path}/i/…` and a ready-made `<img>` tag to
+  paste into a campaign's HTML (shown at up to 600px wide, shrinking to fit
+  phones). The same file uploaded twice is stored once. An image used by a
+  campaign that has been approved or sent can't be deleted, since emails
+  already in inboxes would show a broken picture. Images are served from the
+  app, so links made on a dev machine (`localhost`) won't work in real inboxes.
 
 ## How a campaign works
 

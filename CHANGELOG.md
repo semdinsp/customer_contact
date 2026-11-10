@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.10
+
+**Needs a migration.** Add a host migration calling
+`CustomerContact.Migrations.up(version: 3)` (down: `down(version: 3)`).
+
+* **Images for campaigns.** A new **Images** tab lets admins upload
+  pictures (PNG, JPEG, GIF or WebP, up to 5 MB each, up to 10 at a time).
+  They're stored in the app's database (new `cc_images` table) and served
+  publicly from `{public_path}/i/:id/:filename`, cached by browsers and
+  email image proxies for a year. Each image shows a thumbnail, its size, its
+  address and an `<img>` tag ready to paste into a campaign (width capped at
+  600px, scaling down on phones). The file type is checked from the file's
+  contents, not its name; SVG and anything else is refused. Uploading the
+  same file again reuses the stored image. Deleting an image is refused
+  while a campaign past draft (approved, sending, sent or cancelled) uses it.
+  Uploads and deletions are logged.
+* The campaign editor's HTML box and help point to the Images page.
+* `CustomerContact.Images` for uploading and listing images from code.
+
 ## v0.1.9
 
 No migration needed.

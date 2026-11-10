@@ -12,11 +12,12 @@ defmodule CustomerContact.Web.PublicPlug do
     * `GET  /u/:token`  - unsubscribe confirmation page
     * `POST /u/:token`  - unsubscribe (also RFC 8058 one-click)
     * `POST /sns`       - Amazon SNS endpoint for SES events
+    * `GET  /i/:id/:filename` - an image uploaded on the Images page
   """
 
   use Plug.Router
 
-  alias CustomerContact.{Log, Sender, SESEvents, SNS, Tracking}
+  alias CustomerContact.{Images, Log, Sender, SESEvents, SNS, Tracking}
 
   @pixel Base.decode64!("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
   @max_body 256_000
@@ -104,6 +105,24 @@ defmodule CustomerContact.Web.PublicPlug do
       {:error, reason, conn} ->
         Log.warning("rejected SNS message: #{inspect(reason)}")
         send_resp(conn, 400, "bad request")
+    end
+  end
+
+  # The filename is only for people reading the URL; the id picks the image.
+  get "/i/:id/:_filename" do
+    case Images.get_image_with_data(id) do
+      %{data: data, content_type: type} ->
+        conn
+        |> put_resp_content_type(type, nil)
+        # An image never changes under its id, so it can be cached for good.
+        |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
+        |> put_resp_header("x-content-type-options", "nosniff")
+        |> put_resp_header("content-security-policy", "default-src 'none'; sandbox")
+        |> put_resp_header("cross-origin-resource-policy", "cross-origin")
+        |> send_resp(200, data)
+
+      nil ->
+        send_resp(conn, 404, "not found")
     end
   end
 
