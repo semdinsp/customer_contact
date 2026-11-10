@@ -55,21 +55,22 @@ defmodule CustomerContact.Images do
             uploaded_by: actor
           }
 
-          case repo().insert(image, on_conflict: :nothing, conflict_target: :sha256) do
-            # Lost a race with an identical upload: return that one.
-            {:ok, %Image{id: nil}} ->
-              {:ok, repo().one!(from i in Image, where: i.sha256 == ^sha)}
+          # The id is generated before the insert, so it's set even when the
+          # insert is skipped; re-read by hash to see which row was stored.
+          {:ok, image} = repo().insert(image, on_conflict: :nothing, conflict_target: :sha256)
+          stored = repo().one!(from i in Image, where: i.sha256 == ^sha)
 
-            {:ok, image} ->
-              Log.info("image uploaded",
-                image_id: image.id,
-                filename: image.filename,
-                bytes: image.byte_size,
-                by: actor
-              )
-
-              {:ok, %{image | data: nil}}
+          if stored.id == image.id do
+            Log.info("image uploaded",
+              image_id: image.id,
+              filename: image.filename,
+              bytes: image.byte_size,
+              by: actor
+            )
           end
+
+          # Lost a race with an identical upload: `stored` is that one.
+          {:ok, stored}
       end
     end
   end
