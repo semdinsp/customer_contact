@@ -90,6 +90,12 @@ defmodule CustomerContact.TestMigrationV2 do
   def down, do: CustomerContact.Migrations.down(version: 2)
 end
 
+defmodule CustomerContact.TestMigrationV3 do
+  use Ecto.Migration
+  def up, do: CustomerContact.Migrations.up(version: 3)
+  def down, do: CustomerContact.Migrations.down(version: 3)
+end
+
 defmodule CustomerContact.TestObanMigration do
   use Ecto.Migration
   def up, do: Oban.Migrations.up()

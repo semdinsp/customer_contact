@@ -303,8 +303,7 @@ defmodule CustomerContact.Web.CampaignLive do
                 phx-debounce="600"
               />
               <p class="text-xs opacity-70" id="images-hint">
-                To add a picture, upload it on the
-                <.link navigate={@cc_base <> "/images"} class="link">Images</.link>
+                To add a picture, upload it on the <.link navigate={@cc_base <> "/images"} class="link">Images</.link>
                 page and paste its HTML here.
               </p>
 

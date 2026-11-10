@@ -60,13 +60,13 @@ assertions to match the mode in use.
 ```elixir
 defmodule MyApp.Repo.Migrations.AddCustomerContact do
   use Ecto.Migration
-  def up, do: CustomerContact.Migrations.up(version: 2)
+  def up, do: CustomerContact.Migrations.up(version: 3)
   def down, do: CustomerContact.Migrations.down(version: 1)
 end
 ```
 
 This creates the `cc_*` tables (campaigns, deliveries, events, suppressions,
-test recipients, tags, taggings, contacts).
+test recipients, tags, taggings, contacts, images).
 
 ## 4. Host module
 
@@ -164,7 +164,8 @@ Also check:
 ```elixir
 import CustomerContact.Web.Router
 
-# Public: tracking pixel, click redirect, unsubscribe, SNS webhook.
+# Public: tracking pixel, click redirect, unsubscribe, SNS webhook, and the
+# images admins upload for use in emails.
 # Must be OUTSIDE any pipeline with :protect_from_forgery (SNS and
 # one-click unsubscribe POST without a CSRF token; signed tokens / AWS
 # signatures authorize them instead).
@@ -219,8 +220,8 @@ Add tests in this app (and make sure they pass):
 
 1. A non-admin, and a logged-out visitor, can't load `/admin/contact`: they
    get a redirect.
-2. An admin can load `/admin/contact`, `/admin/contact/audience` and
-   `/admin/contact/campaigns/new`.
+2. An admin can load `/admin/contact`, `/admin/contact/audience`,
+   `/admin/contact/images` and `/admin/contact/campaigns/new`.
 3. `MyApp.CustomerContactHost.list_recipients/0` returns `%CustomerContact.Recipient{}`
    structs with string refs and leaves out blocked people. If you implemented
    segments, test `recipients_for_segments/1` too.
